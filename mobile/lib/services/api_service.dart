@@ -328,6 +328,52 @@ class ApiService {
     return null;
   }
 
+  // ---- Yönetici (admin) uçları: mobil yönetici görünümü için ----
+  // Bu uçlar backend'de require_admin() ile korunur; yalnızca 'yonetici' rolü erişebilir.
+
+  /// Panel özeti (istatistik + tesis özeti + son işler). Hata durumunda null.
+  static Future<Map<String, dynamic>?> getAdminDashboard() async {
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/admin/dashboard.php'), headers: await _authHeaders());
+      if (r.statusCode == 200) return jsonDecode(r.body) as Map<String, dynamic>;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Masraf listesi (opsiyonel durum filtresi). Hata durumunda null.
+  static Future<List<dynamic>?> getAdminMasraflar({String? durum}) async {
+    try {
+      final url = '$baseUrl/admin/masraflar.php${durum != null ? '?durum=$durum' : ''}';
+      final r = await http.get(Uri.parse(url), headers: await _authHeaders());
+      if (r.statusCode == 200) return jsonDecode(r.body)['data'] ?? [];
+    } catch (_) {}
+    return null;
+  }
+
+  /// Masraf onayla/reddet. islem: 'onayla' | 'reddet'.
+  static Future<Map<String, dynamic>> adminMasrafIslem(int id, String islem) async {
+    try {
+      final r = await http.post(
+        Uri.parse('$baseUrl/admin/masraflar.php'),
+        headers: await _authHeaders(),
+        body: jsonEncode({'id': id, 'islem': islem}),
+      );
+      final data = jsonDecode(r.body);
+      return {'success': r.statusCode == 200, 'message': data['message'] ?? 'İşlem tamamlandı.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Bağlantı hatası: $e'};
+    }
+  }
+
+  /// Firma arıza listesi. Hata durumunda null.
+  static Future<List<dynamic>?> getAdminArizalar() async {
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/admin/arizalar.php'), headers: await _authHeaders());
+      if (r.statusCode == 200) return jsonDecode(r.body)['data'] ?? [];
+    } catch (_) {}
+    return null;
+  }
+
   // Arıza durumunu güncelle. durum: 'cozuldu' | 'bekliyor' | 'dis_destek'.
   // 'cozuldu' için cozumFotograf (base64) zorunludur.
   static Future<Map<String, dynamic>> updateFault(int arizaId, String durum, {String? not, String? cozumFotograf}) async {

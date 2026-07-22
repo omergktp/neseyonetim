@@ -6,6 +6,7 @@ import '../services/fcm_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
 import '../widgets/brand_logo.dart';
+import 'admin_home_screen.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -74,12 +75,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       FcmService.syncToken();
       final prefs = await SharedPreferences.getInstance();
       final colorHex = prefs.getString('theme_color') ?? '#3B82F6';
+      final rol = prefs.getString('rol');
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, __, ___) => HomeScreen(themeColor: colorHex),
+          // Yönetici cepten kontrol ekranına, saha personeli görev listesine gider.
+          pageBuilder: (_, __, ___) => rol == 'yonetici'
+              ? AdminHomeScreen(themeColor: colorHex)
+              : HomeScreen(themeColor: colorHex),
           transitionsBuilder: (_, anim, __, child) {
             return FadeTransition(opacity: anim, child: child);
           },

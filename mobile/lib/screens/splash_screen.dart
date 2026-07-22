@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/glowing_blob.dart';
+import 'admin_home_screen.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 
@@ -54,12 +55,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final themeColor = prefs.getString('theme_color') ?? widget.themeColorHex;
+    final rol = prefs.getString('rol');
 
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) =>
-            tokenGecerli ? HomeScreen(themeColor: themeColor) : LoginScreen(),
+        builder: (_) => !tokenGecerli
+            ? LoginScreen()
+            // Yönetici cepten kontrol ekranına, saha personeli görev listesine gider.
+            : (rol == 'yonetici'
+                ? AdminHomeScreen(themeColor: themeColor)
+                : HomeScreen(themeColor: themeColor)),
       ),
     );
   }
