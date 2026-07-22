@@ -21,7 +21,8 @@ jobs:
       - name: Bağımlılıkları yükle
         run: flutter pub get
       - name: Statik analiz
-        run: flutter analyze
+        # info düzeyi öneriler build'i kırmasın; error/warning kırar
+        run: flutter analyze --no-fatal-infos
       - name: Testler
         run: flutter test
 
