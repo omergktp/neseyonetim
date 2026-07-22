@@ -179,7 +179,11 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return {'success': true, 'tasks': data['data']};
+        return {
+          'success': true,
+          'tasks': data['data'],
+          'bugunTamamlanan': data['bugun_tamamlanan'] ?? 0,
+        };
       } else {
         return {
           'success': false,

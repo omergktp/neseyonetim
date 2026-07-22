@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/offline_queue.dart';
 import '../services/sync_service.dart';
 import '../services/fcm_service.dart';
 import '../theme/app_theme.dart';
@@ -22,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<dynamic> _tasks = [];
   bool _isLoading = true;
   String? _yuklemeHatasi; // null: sorun yok; dolu: liste yüklenemedi (boş listeyle karışmasın)
+  int _bugunTamamlanan = 0; // gün sonu "işimi bitirdim" sayacı
+  int _bekleyenKuyruk = 0;  // offline kuyrukta gönderilmeyi bekleyen kayıt sayısı
 
   List<dynamic> _faults = [];
   bool _faultsLoading = false;
@@ -63,11 +66,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       UiUtils.showSnackBar('$gonderilen bekleyen görev sunucuya gönderildi.');
     }
 
+    // Offline kuyrukta bekleyen kayıt sayısı (rozet için)
+    final bekleyen =
+        (await OfflineQueue.getQueue()).length + (await OfflineQueue.getRequests()).length;
+
     final result = await ApiService.getTasks();
     if (!mounted) return;
+    _bekleyenKuyruk = bekleyen;
     if (result['success']) {
       setState(() {
         _tasks = result['tasks'];
+        _bugunTamamlanan = (result['bugunTamamlanan'] as num?)?.toInt() ?? 0;
         _isLoading = false;
         _yuklemeHatasi = null;
       });
@@ -159,6 +168,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     final actions = [
+      // Offline kuyruk rozeti: personel "kaydım kayboldu mu?" endişesi yaşamasın.
+      if (_bekleyenKuyruk > 0)
+        IconButton(
+          icon: Badge(
+            label: Text('$_bekleyenKuyruk'),
+            child: const Icon(Icons.cloud_upload_outlined),
+          ),
+          tooltip: 'Gönderilmeyi bekleyen kayıtlar',
+          onPressed: () {
+            UiUtils.showSnackBar(
+                '$_bekleyenKuyruk kayıt cihazda güvende; internet gelince otomatik gönderilecek.');
+          },
+        ),
       IconButton(
         icon: const Icon(Icons.refresh),
         tooltip: 'Yenile',
@@ -250,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(width: 10),
               _miniStat(bekleyen.toString(), 'Bekleyen', Icons.schedule),
               const SizedBox(width: 10),
-              _miniStat(toplam.toString(), 'Toplam', Icons.assignment),
+              _miniStat(_bugunTamamlanan.toString(), 'Bugün biten', Icons.check_circle),
             ],
           ),
         ],

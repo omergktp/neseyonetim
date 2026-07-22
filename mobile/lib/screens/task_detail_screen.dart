@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -77,17 +78,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   // ---------------- GÖREV BAŞLATMA (QR veya Konum) ----------------
 
   // Sahada olma (50m) doğrulaması; uygunsa konumu döndürür (sunucuya da gönderilir).
+  // Başarısızsa kullanıcıyı yalnız bırakmaz: kaç metre uzakta olduğunu söyler,
+  // konum kapalıysa tek dokunuşla ayarlara götürür.
   Future<Position?> _konumDogrula() async {
     final position = await LocationService.getCurrentLocation();
     if (position == null) {
-      _showError(LocationService.sonHata ?? 'Konum bilgisi alınamadı. Konum servislerini açın.');
+      if (!mounted) return null;
+      UiUtils.showSnackBar(
+        LocationService.sonHata ?? 'Konum bilgisi alınamadı. Konum servislerini açın.',
+        isError: true,
+        actionLabel: 'Ayarlar',
+        onAction: LocationService.sonHataAyariniAc,
+      );
       return null;
     }
     double siteLat = double.tryParse(widget.task['enlem']?.toString() ?? '0') ?? 0.0;
     double siteLng = double.tryParse(widget.task['boylam']?.toString() ?? '0') ?? 0.0;
     if (siteLat != 0 && siteLng != 0) {
-      if (!LocationService.isWithinRange(position.latitude, position.longitude, siteLat, siteLng)) {
-        _showError('Tesise en fazla 50 metre yakında olmalısınız.');
+      final mesafe = LocationService.calculateDistance(
+          position.latitude, position.longitude, siteLat, siteLng);
+      if (mesafe > 50) {
+        _showError('Tesise ${mesafe.round()} m uzaktasın; en fazla 50 m yakında olmalısın.');
         return null;
       }
     } else {
@@ -130,6 +141,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         qrDeger: qrDeger, enlem: pos?.latitude, boylam: pos?.longitude);
     if (!mounted) return;
     if (res['success']) {
+      HapticFeedback.mediumImpact();
       setState(() => _durum = 'devam_ediyor');
       _ensureCamera(); // tamamla adımına geçildi: kamerayı şimdi aç
       _showSuccess('Görev başlatıldı. Şimdi fotoğraf çekip tamamlayabilirsiniz.');
@@ -141,26 +153,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   // ---------------- GÖREV TAMAMLAMA ----------------
 
   Future<void> _completeTask() async {
+    // 0. Checklist eksikse nazik onay iste (iş kalitesi güvencesi).
+    final altGorevler = (widget.task['alt_gorevler'] as List?) ?? const [];
+    final eksik = altGorevler.where((g) => g['yapildi_mi'].toString() != '1').length;
+    if (eksik > 0) {
+      final devamEt = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Eksik adım var'),
+          content: Text('$eksik checklist adımı henüz işaretlenmedi. Yine de görevi tamamlamak istiyor musun?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Geri Dön')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yine de Tamamla')),
+          ],
+        ),
+      );
+      if (devamEt != true) return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // 1. Konum Doğrulaması (50 metre kuralı)
-      final position = await LocationService.getCurrentLocation();
-      if (position == null) {
-        _showError(LocationService.sonHata ?? 'Konum bilgisi alınamadı. Konum servislerini açın.');
-        return;
-      }
-
-      double siteLat = double.tryParse(widget.task['enlem']?.toString() ?? '0') ?? 0.0;
-      double siteLng = double.tryParse(widget.task['boylam']?.toString() ?? '0') ?? 0.0;
-
-      if (siteLat != 0 && siteLng != 0) {
-        bool isClose = LocationService.isWithinRange(position.latitude, position.longitude, siteLat, siteLng);
-        if (!isClose) {
-          _showError('Görevi tamamlamak için tesise en fazla 50 metre yakında olmalısınız.');
-          return;
-        }
-      }
+      // 1. Konum Doğrulaması (50 metre kuralı) — mesafe geri bildirimi ile
+      final position = await _konumDogrula();
+      if (position == null) return;
 
       // 2. Fotoğraf Çekimi (Kural 2: Galeri yasak)
       if (_cameraController == null || !_cameraController!.value.isInitialized) {
@@ -168,11 +184,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         return;
       }
 
-      final XFile photo = await _cameraController!.takePicture();
-      String path = photo.path;
-
-      // 3. Filigran Ekle (Kural 4)
-      await CameraService.addWatermark(path, position.latitude, position.longitude);
+      // Çek -> filigranla -> önizle; net değilse tekrar çek.
+      String? path;
+      while (path == null) {
+        final XFile photo = await _cameraController!.takePicture();
+        HapticFeedback.mediumImpact(); // deklanşör hissi
+        // 3. Filigran Ekle (Kural 4)
+        await CameraService.addWatermark(photo.path, position.latitude, position.longitude);
+        if (!mounted) return;
+        final onay = await _fotoOnayla(photo.path);
+        if (onay == null) return;      // kullanıcı vazgeçti
+        if (onay) path = photo.path;   // false ise döngü tekrar çeker
+      }
 
       // Fotoğrafı Base64'e çevir
       final bytes = await File(path).readAsBytes();
@@ -186,18 +209,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (hasInternet) {
         final sonuc = await ApiService.saveTask(taskId, position.latitude, position.longitude, base64Image);
         if (sonuc == 'ok') {
-           _showSuccess('Görev başarıyla tamamlandı!');
+          await _kutlamaGoster('Konum doğrulandı, kanıt fotoğrafı sunucuya iletildi.');
         } else if (sonuc == 'rejected') {
-           // Sunucu kalıcı olarak reddetti (görev kapatılmış/iptal olabilir) — kuyruğa ALMA.
-           _showError('Sunucu görevi kabul etmedi. Görev durumu değişmiş olabilir, listeyi yenileyin.');
-           return;
+          // Sunucu kalıcı olarak reddetti (görev kapatılmış/iptal olabilir) — kuyruğa ALMA.
+          _showError('Sunucu görevi kabul etmedi. Görev durumu değişmiş olabilir, listeyi yenileyin.');
+          return;
         } else {
-           await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, base64Image);
-           _showSuccess('Görev kapandı ancak sunucuya bağlanamadı. İnternet olunca otomatik gönderilecek.');
+          await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, base64Image);
+          await _kutlamaGoster('Sunucuya ulaşılamadı; kayıt cihazda güvende, internet gelince otomatik gönderilecek.');
         }
       } else {
         await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, base64Image);
-        _showSuccess('İnternet bağlantısı yok. Görev başarıyla kuyruğa alındı.');
+        await _kutlamaGoster('İnternet yok; kayıt cihazda güvende, bağlantı gelince otomatik gönderilecek.');
       }
 
       if (mounted) Navigator.pop(context);
@@ -209,6 +232,87 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // Çekilen (filigranlı) fotoğrafın önizlemesi: bulanık kanıt yönetici tarafından
+  // reddedilebilir; personele "Net mi?" diye tek bakışta karar şansı verir.
+  // Dönüş: true = onaylandı, false = tekrar çek, null = vazgeçildi.
+  Future<bool?> _fotoOnayla(String path) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fotoğraf net mi?'),
+        contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(File(path), height: 280, width: double.maxFinite, fit: BoxFit.cover),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, false),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tekrar Çek'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.check),
+            label: const Text('Onayla'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Tamamlama kutlaması: emeğin görünür olduğu, "işimi kanıtladım" anı.
+  Future<void> _kutlamaGoster(String altMetin) async {
+    if (!mounted) return;
+    HapticFeedback.mediumImpact();
+    final saat = TimeOfDay.now().format(context);
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.elasticOut,
+              builder: (context, value, child) => Transform.scale(scale: value, child: child),
+              child: Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle, color: AppTheme.success, size: 56),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Görev Tamamlandı!', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            Text('Saat $saat', style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+            const SizedBox(height: 10),
+            Text(altMetin,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppTheme.textDark, fontSize: 13.5, height: 1.4)),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white),
+              child: const Text('Harika!'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String msg) {
@@ -307,6 +411,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _toggleSubtask(Map g) async {
     final id = int.tryParse(g['id'].toString()) ?? 0;
     if (id == 0) return;
+    HapticFeedback.selectionClick(); // eldivenli kullanımda "işaretlendi" hissi
     final eski = g['yapildi_mi'].toString() == '1';
     final yeni = !eski;
     setState(() => g['yapildi_mi'] = yeni ? 1 : 0);
@@ -314,6 +419,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (!ok && mounted) {
       setState(() => g['yapildi_mi'] = eski ? 1 : 0);
       UiUtils.showSnackBar('Adım kaydedilemedi, tekrar deneyin.', isError: true);
+      return;
+    }
+    // Son adım da işaretlendiyse küçük bir kutlama titreşimi (tamamlamaya doğal geçiş).
+    final list = (widget.task['alt_gorevler'] as List?) ?? const [];
+    if (yeni && list.isNotEmpty && list.every((x) => x['yapildi_mi'].toString() == '1')) {
+      HapticFeedback.mediumImpact();
     }
   }
 
@@ -531,16 +642,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 54,
-            child: ElevatedButton.icon(
-              onPressed: _completeTask,
-              icon: const Icon(Icons.check_circle),
-              label: const Text('Görevi Tamamla', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white),
-            ),
-          ),
         ],
       ),
     );
@@ -554,6 +655,25 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         title: Text(widget.task['baslik'] ?? 'Görev Detayı'),
         flexibleSpace: AppTheme.appBarFlex(_primary),
       ),
+      // Ana eylem her zaman başparmak bölgesinde: uzun checklist'te bile
+      // scroll gerektirmeden tek elle erişilir.
+      bottomNavigationBar: (basladi && !_isLoading)
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: _completeTask,
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Görevi Tamamla', style: TextStyle(fontSize: 16)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.success, foregroundColor: Colors.white),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

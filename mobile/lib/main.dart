@@ -10,6 +10,7 @@ import 'services/sync_service.dart';
 import 'services/fcm_service.dart';
 import 'services/api_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/ui_utils.dart';
 
 // Ön planda gelen bildirimleri göstermek için global messenger anahtarı
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -60,6 +61,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Glow Saha',
+      navigatorKey: appNavigatorKey,
       scaffoldMessengerKey: scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(AppTheme.parseHex(themeColorHex)),

@@ -51,9 +51,16 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $tasks[] = $row;
 }
 
+// Gün sonu "işimi bitirdim" hissi için: bugün tamamlanan görev sayısı.
+$bugun = $db->prepare("SELECT COUNT(*) FROM is_emirleri
+                       WHERE firma_id = :firma_id AND personel_id = :personel_id
+                         AND durum = 'tamamlandi' AND DATE(tamamlanma_tarihi) = CURDATE()");
+$bugun->execute([':firma_id' => $firma_id, ':personel_id' => $personel_id]);
+
 http_response_code(200);
 echo json_encode([
     "message" => "Görevler başarıyla getirildi.",
     "toplam_gorev" => count($tasks),
+    "bugun_tamamlanan" => (int)$bugun->fetchColumn(),
     "data" => $tasks
 ]);

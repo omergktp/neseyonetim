@@ -45,6 +45,17 @@ class LocationService {
     return position;
   }
 
+  /// Son hataya uygun ayar ekranını açar: servis kapalıysa konum ayarları,
+  /// izin kalıcı reddedildiyse uygulama ayarları. Snackbar "Ayarlar" aksiyonundan çağrılır.
+  static Future<void> sonHataAyariniAc() async {
+    if (sonHata == null) return;
+    if (sonHata!.contains('kapalı')) {
+      await Geolocator.openLocationSettings();
+    } else {
+      await Geolocator.openAppSettings();
+    }
+  }
+
   // İki konum arasındaki mesafeyi metre cinsinden hesaplar
   static double calculateDistance(double startLat, double startLng, double endLat, double endLng) {
     return Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
