@@ -306,6 +306,7 @@
                             <option value="">Tüm Durumlar</option><option value="bekliyor">Bekliyor</option><option value="devam_ediyor">Devam Ediyor</option>
                             <option value="tamamlandi">Tamamlandı</option><option value="iptal">İptal</option>
                         </select>
+                        <button onclick="csvIndirIsEmirleri()" title="Excel/CSV olarak indir" class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-file-csv"></i> CSV</button>
                         <button onclick="openIsEmriModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Yeni İş Emri</button>
                     </div>
                 </div>
@@ -357,6 +358,7 @@
                         <select id="masraf-filtre" onchange="loadMasraflar()" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none">
                             <option value="">Tüm Durumlar</option><option value="bekliyor">Bekliyor</option><option value="onaylandi">Onaylandı</option><option value="reddedildi">Reddedildi</option>
                         </select>
+                        <button onclick="csvIndirMasraflar()" title="Excel/CSV olarak indir" class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-file-csv"></i> CSV</button>
                     </div>
                 </div>
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
@@ -726,6 +728,47 @@
             dis_destek:['bg-purple-50 text-purple-600','bg-purple-500','Dış Destek Gerekli'],
         };
         function durumBadge(d) { const [c,dot,l] = DURUM[d] || DURUM.bekliyor; return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${c}"><span class="w-1.5 h-1.5 rounded-full ${dot}"></span> ${l}</span>`; }
+
+        // ---- CSV dışa aktarım (muhasebe/raporlama için ham veri) ----
+        // Excel'in Türkçe yerelinde doğru açılması için: UTF-8 BOM + noktalı virgül ayracı.
+        function csvIndir(dosyaAdi, basliklar, satirlar) {
+            const kacir = (v) => {
+                const s = String(v ?? '');
+                return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+            const icerik = '﻿' + [basliklar, ...satirlar].map(r => r.map(kacir).join(';')).join('\r\n');
+            const blob = new Blob([icerik], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = dosyaAdi;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        function csvIndirMasraflar() {
+            const durumAd = (d) => (DURUM[d] || [,,d])[2];
+            csvIndir(
+                `masraflar_${new Date().toISOString().slice(0,10)}.csv`,
+                ['Kalem', 'Personel', 'Rol', 'İlgili İş/Arıza', 'Tesis', 'Tutar (TL)', 'Durum', 'Tarih'],
+                _masrafListe.map(m => [
+                    m.kalem_adi, m.personel_adi || '-', m.personel_rol || '-',
+                    m.is_emri_baslik || m.ariza_baslik || '-', m.site_adi || '-',
+                    String(m.tutar).replace('.', ','), durumAd(m.durum), m.olusturma_tarihi || '-',
+                ])
+            );
+            toast('Masraflar CSV olarak indirildi.', 'success');
+        }
+        function csvIndirIsEmirleri() {
+            const durumAd = (d) => (DURUM[d] || [,,d])[2];
+            csvIndir(
+                `is_emirleri_${new Date().toISOString().slice(0,10)}.csv`,
+                ['Görev Başlığı', 'Tesis', 'Personel', 'Durum', 'Oluşturulma', 'Tamamlanma'],
+                _isEmriListe.map(r => [
+                    r.baslik, r.site_adi || '-', r.personel_adi || '-',
+                    durumAd(r.durum), r.olusturma_tarihi || '-', r.tamamlanma_tarihi || '-',
+                ])
+            );
+            toast('İş emirleri CSV olarak indirildi.', 'success');
+        }
         function personelHucre(ad) { return ad ? `<div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">${esc(bashar(ad))}</div><span class="text-slate-600">${esc(ad)}</span></div>` : '<span class="text-slate-400 italic">Atanmadı</span>'; }
 
         const ROL = { yonetici:['bg-amber-50 text-amber-700','Yönetici'], teknik:['bg-violet-50 text-violet-700','Teknik'], temizlik:['bg-blue-50 text-blue-700','Temizlik'] };
