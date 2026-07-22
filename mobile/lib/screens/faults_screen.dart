@@ -47,6 +47,7 @@ class _FaultsScreenState extends State<FaultsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Arızalarım', style: TextStyle(fontWeight: FontWeight.bold)),
+        flexibleSpace: AppTheme.appBarFlex(Theme.of(context).colorScheme.primary),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load)],
       ),
       body: RefreshIndicator(
@@ -195,9 +196,12 @@ class _FaultDetailScreenState extends State<FaultDetailScreen> {
     final arizaId = int.tryParse(a['id'].toString()) ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text(a['baslik'] ?? 'Arıza')),
+      appBar: AppBar(
+        title: Text(a['baslik'] ?? 'Arıza'),
+        flexibleSpace: AppTheme.appBarFlex(Theme.of(context).colorScheme.primary),
+      ),
       body: _loading
-          ? Center(child: AppTheme.loadingBox('İşleniyor...', color: AppTheme.info))
+          ? Center(child: AppTheme.loadingBox('İşleniyor...', color: Theme.of(context).colorScheme.primary))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -284,7 +288,7 @@ class _FaultDetailScreenState extends State<FaultDetailScreen> {
                   const SizedBox(height: 10),
                   AppTheme.infoPanel(
                     icon: Icons.camera_alt_outlined,
-                    color: AppTheme.info,
+                    color: Theme.of(context).colorScheme.primary,
                     text: '"Çözüldü" seçilince kamera açılır ve çözüm fotoğrafı çekmen gerekir.',
                   ),
                   const SizedBox(height: 12),

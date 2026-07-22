@@ -152,7 +152,10 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
     final seed = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Arıza Bildir')),
+      appBar: AppBar(
+        title: const Text('Arıza Bildir'),
+        flexibleSpace: AppTheme.appBarFlex(seed),
+      ),
       body: _loading
           ? AppTheme.loadingBox('Arıza bildiriliyor...', color: AppTheme.danger)
           : SingleChildScrollView(

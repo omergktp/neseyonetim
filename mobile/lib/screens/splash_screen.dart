@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/glowing_blob.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -71,39 +73,19 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       );
 
-  Widget _logoKutusu({double size = 84, double fontSize = 44}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)]),
-        borderRadius: BorderRadius.circular(size * 0.26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Text('G',
-            style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
-
-
   @override
   Widget build(BuildContext context) {
+    // Bloblar firma temasından türesin (marka bütünlüğü — Login ile aynı mantık).
+    final seed = AppTheme.parseHex(widget.themeColorHex);
+    final ikinci = AppTheme.brandGradient(seed).colors[1];
+
     return Scaffold(
       body: Container(
         decoration: _bgDecoration,
         child: Stack(
           children: [
-            const Positioned(top: -60, left: -40, child: GlowingBlob(color: Color(0xFF6366F1))),
-            const Positioned(bottom: -80, right: -50, child: GlowingBlob(color: Color(0xFF8B5CF6))),
+            Positioned(top: -60, left: -40, child: GlowingBlob(color: seed)),
+            Positioned(bottom: -80, right: -50, child: GlowingBlob(color: ikinci)),
             _guncellemeZorunlu ? _buildUpdate() : _buildLoading(),
           ],
         ),
@@ -116,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _logoKutusu(),
+          const BrandLogo(size: 84),
           const SizedBox(height: 22),
           const Text('GLOW SAHA',
               style: TextStyle(
@@ -145,7 +127,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _logoKutusu(size: 72, fontSize: 38),
+            const BrandLogo(size: 72),
             const SizedBox(height: 28),
             Container(
               padding: const EdgeInsets.all(24),

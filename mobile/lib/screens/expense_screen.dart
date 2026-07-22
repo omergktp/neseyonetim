@@ -137,7 +137,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
-      appBar: AppBar(title: const Text('Masraf / Malzeme Girişi')),
+      appBar: AppBar(
+        title: const Text('Masraf / Malzeme Girişi'),
+        flexibleSpace: AppTheme.appBarFlex(primary),
+      ),
       body: _isLoading
           ? AppTheme.loadingBox('Gönderiliyor...', color: primary)
           : SingleChildScrollView(
@@ -148,7 +151,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                   // Bilgi paneli — AppTheme.infoPanel ile standardize edildi
                   AppTheme.infoPanel(
                     icon: Icons.receipt_long_outlined,
-                    color: AppTheme.info,
+                    color: primary,
                     title: 'Masraf / Malzeme Girişi',
                     text: 'Malzeme/masraf kalemini, tutarını gir ve fiş/fatura fotoğrafını çek. Yönetici onayına gönderilecek.',
                   ),

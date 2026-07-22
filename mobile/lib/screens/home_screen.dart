@@ -146,11 +146,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final primaryColor = _getPrimaryColor();
 
+    // FAB firma rengini kullanır; kırmızı yalnızca gerçekten yıkıcı işlemlere saklanır
+    // (firma rengi kırmızı/turuncu olan tenant'larda görsel çakışmayı da önler).
     final fab = FloatingActionButton.extended(
       onPressed: () {
         Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportFaultScreen()));
       },
-      backgroundColor: AppTheme.danger,
+      backgroundColor: primaryColor,
       foregroundColor: Colors.white,
       icon: const Icon(Icons.report_problem),
       label: const Text('Arıza Bildir'),
@@ -177,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           appBar: AppBar(
             title: const Text('Glow Saha', style: TextStyle(fontWeight: FontWeight.bold)),
             backgroundColor: primaryColor,
+            flexibleSpace: AppTheme.appBarFlex(primaryColor),
             actions: actions,
             bottom: const TabBar(
               indicatorColor: Colors.white,
@@ -204,6 +207,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('İş Emirlerim', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: primaryColor,
+        flexibleSpace: AppTheme.appBarFlex(primaryColor),
         actions: actions,
       ),
       body: _buildTasksBody(primaryColor),
@@ -428,15 +432,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     final bekliyor = a['durum'] == 'bekliyor';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 6))],
-                      ),
+                      decoration: AppTheme.cardDecoration,
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(20),
                           onTap: () async {
                             await Navigator.push(
                               context,
@@ -451,8 +451,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 Container(
                                   width: 46,
                                   height: 46,
-                                  decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(14)),
-                                  child: Icon(bekliyor ? Icons.hourglass_bottom : Icons.warning_amber_rounded, color: const Color(0xFFDC2626)),
+                                  decoration: BoxDecoration(
+                                      color: AppTheme.danger.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(14)),
+                                  child: Icon(bekliyor ? Icons.hourglass_bottom : Icons.warning_amber_rounded,
+                                      color: AppTheme.danger),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(

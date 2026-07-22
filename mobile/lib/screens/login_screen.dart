@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/brand_logo.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,11 +25,22 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   late AnimationController _bgController;
 
+  // Firma teması (daha önce giriş yapıldıysa kayıtlıdır); marka bütünlüğü için
+  // arka plan blobları ve buton gradyanı bu renkten türetilir.
+  Color _seed = const Color(0xFF3B82F6);
+
   @override
   void initState() {
     super.initState();
     _ipController.text = ApiService.serverIp;
-    
+
+    SharedPreferences.getInstance().then((prefs) {
+      final hex = prefs.getString('theme_color');
+      if (hex != null && mounted) {
+        setState(() => _seed = AppTheme.parseHex(hex));
+      }
+    });
+
     // Arka plan animasyonu için kontrolcü
     _bgController = AnimationController(
       vsync: this,
@@ -118,6 +131,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // Marka gradyanının iki ucu: firma seed rengi + ton kaydırılmış eşi.
+    final gradyan = AppTheme.brandGradient(_seed);
+    final ikinciRenk = gradyan.colors[1];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: Stack(
@@ -138,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFF3B82F6).withValues(alpha: 0.6),
+                            _seed.withValues(alpha: 0.6),
                             Colors.transparent,
                           ],
                         ),
@@ -155,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFF8B5CF6).withValues(alpha: 0.5),
+                            ikinciRenk.withValues(alpha: 0.5),
                             Colors.transparent,
                           ],
                         ),
@@ -194,29 +211,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           child: child,
                         );
                       },
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF60A5FA), Color(0xFFA78BFA)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.5),
-                              blurRadius: 30,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
-                        ),
-                        child: const Center(
-                          child: Text('G', style: TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w900)),
-                        ),
-                      ),
+                      child: const BrandLogo(size: 96),
                     ),
                     const SizedBox(height: 24),
                     const Text(
@@ -225,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Premium Mobil Portal',
+                      'Tesis ve Saha Yönetim Sistemi',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 16, letterSpacing: 0.5),
                     ),
                     const SizedBox(height: 48),
@@ -282,14 +277,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 height: 60,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(20),
-                                  gradient: LinearGradient(
-                                    colors: _isLoading 
-                                      ? [Colors.grey.shade600, Colors.grey.shade700]
-                                      : [const Color(0xFF3B82F6), const Color(0xFF8B5CF6)],
-                                  ),
+                                  gradient: _isLoading
+                                      ? LinearGradient(colors: [Colors.grey.shade600, Colors.grey.shade700])
+                                      : gradyan,
                                   boxShadow: _isLoading ? [] : [
                                     BoxShadow(
-                                      color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                                      color: _seed.withValues(alpha: 0.4),
                                       blurRadius: 20,
                                       offset: const Offset(0, 8),
                                     )

@@ -503,7 +503,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           const SizedBox(height: 10),
           AppTheme.infoPanel(
             icon: Icons.verified_user_outlined,
-            color: AppTheme.info,
+            color: _primary,
             text: 'Tamamlamak için tesise en fazla 50 m yakında olmalısın; fotoğrafa konum ve saat eklenir.',
           ),
           if (_rol == 'teknik') ...[
@@ -550,7 +550,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget build(BuildContext context) {
     final basladi = _durum != 'bekliyor';
     return Scaffold(
-      appBar: AppBar(title: Text(widget.task['baslik'] ?? 'Görev Detayı')),
+      appBar: AppBar(
+        title: Text(widget.task['baslik'] ?? 'Görev Detayı'),
+        flexibleSpace: AppTheme.appBarFlex(_primary),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

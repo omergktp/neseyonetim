@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Uygulama geneli tema ve yeniden kullanılabilir görsel yardımcılar.
 class AppTheme {
@@ -25,6 +26,30 @@ class AppTheme {
   static const Color danger = Color(0xFFDC2626);  // red-600
   static const Color warning = Color(0xFFD97706); // amber-600
   static const Color info = Color(0xFF7C3AED);    // violet-600
+
+  /// Marka gradyanı: firma seed renginden türetilir. Sabit mavi-mor yerine
+  /// her firmanın kendi rengine uyan bir gradyan üretir (login butonu, özet şeridi vb.).
+  static LinearGradient brandGradient(Color seed) {
+    final hsl = HSLColor.fromColor(seed);
+    final ikinci = hsl.withHue((hsl.hue + 30) % 360).toColor();
+    return LinearGradient(
+      colors: [seed, ikinci],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
+
+  /// AppBar için ince premium gradyan (düz tek renk yerine katmanlı his).
+  /// Kullanım: AppBar(flexibleSpace: AppTheme.appBarFlex(renk), ...)
+  static Widget appBarFlex(Color seed) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [seed, Color.lerp(seed, Colors.black, 0.22)!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+      );
 
   // Kartlar için tek noktadan gölge (Premium, katmanlı, çok yumuşak gölge).
   static List<BoxShadow> get cardShadow => [
@@ -164,7 +189,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+            color: Colors.white, fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.2),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       cardTheme: CardThemeData(
@@ -227,13 +253,19 @@ class AppTheme {
           focusedBorder: ob(seed, 1.6),
         ),
       ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(fontWeight: FontWeight.bold, color: textDark),
-        titleMedium: TextStyle(fontWeight: FontWeight.w600, color: textDark),
-        titleSmall: TextStyle(fontWeight: FontWeight.w600, color: textDark, fontSize: 14),
-        bodyLarge: TextStyle(color: textDark, fontSize: 15, height: 1.4),
-        bodyMedium: TextStyle(color: textDark, fontSize: 13.5, height: 1.4),
-        labelLarge: TextStyle(fontWeight: FontWeight.w600, color: textDark),
+      // Tipografi: gövde Inter (web paneliyle birebir aynı), başlıklar Plus Jakarta Sans.
+      // Not: google_fonts ilk render'da fontu indirir ve cihazda önbelleğe alır;
+      // internet yoksa sistem fontuna düşer (görsel fark, işlevsel sorun değil).
+      textTheme: GoogleFonts.interTextTheme().copyWith(
+        titleLarge: GoogleFonts.plusJakartaSans(
+            fontSize: 22, fontWeight: FontWeight.w700, color: textDark, letterSpacing: -0.2),
+        titleMedium: GoogleFonts.plusJakartaSans(
+            fontSize: 17, fontWeight: FontWeight.w600, color: textDark, letterSpacing: -0.1),
+        titleSmall: GoogleFonts.plusJakartaSans(
+            fontSize: 14, fontWeight: FontWeight.w600, color: textDark),
+        bodyLarge: GoogleFonts.inter(color: textDark, fontSize: 15, height: 1.5),
+        bodyMedium: GoogleFonts.inter(color: textDark, fontSize: 13.5, height: 1.45),
+        labelLarge: GoogleFonts.inter(fontWeight: FontWeight.w600, color: textDark, fontSize: 14),
       ),
     );
   }
