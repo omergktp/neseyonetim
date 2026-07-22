@@ -1,6 +1,9 @@
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/splash_screen.dart';
 import 'services/sync_service.dart';
@@ -19,6 +22,16 @@ void main() async {
 
   // Firebase'i başlat ve FCM'i kur (bildirim izni + token kaydı + ön plan bildirimleri)
   await Firebase.initializeApp();
+
+  // Crash raporlama: sahadaki telefonlarda oluşan çökmeler Firebase Crashlytics'e düşer.
+  // Debug modda gönderme (geliştirme gürültüsü yaratmasın).
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   await FcmService.init(scaffoldMessengerKey);
 

@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase / FCM
     id("com.google.gms.google-services")
+    // Crash raporlama (Firebase Crashlytics)
+    id("com.google.firebase.crashlytics")
 }
 
 android {

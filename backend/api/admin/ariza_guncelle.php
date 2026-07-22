@@ -30,6 +30,7 @@ if (isset($data->islem) && $data->islem === 'sil') {
     // Bağlı masraflar FK ON DELETE CASCADE ile birlikte silinir.
     $del = $db->prepare("DELETE FROM arizalar WHERE id = :id AND firma_id = :fid");
     $del->execute([':id' => $id, ':fid' => $firma_id]);
+    log_action($db, $user, 'ariza_sil', 'ariza', $id, $ariza['baslik'] ?? null);
     json_out(200, ["message" => "Arıza kaydı silindi."]);
 }
 
@@ -115,4 +116,7 @@ if ($atanan_teknik !== null) {
     } catch (Throwable $e) { /* bildirim opsiyonel */ }
 }
 
+log_action($db, $user, 'ariza_guncelle', 'ariza', $id,
+    (isset($data->durum) ? "durum: {$data->durum}" : null) .
+    ($atanan_teknik !== null ? " teknik atandı: $atanan_teknik" : ''));
 json_out(200, ["message" => "Arıza güncellendi."]);

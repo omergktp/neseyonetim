@@ -109,6 +109,7 @@ if ($method === 'POST') {
             if ($silinenGorev > 0) {
                 $msg .= " Personelin bekleyen $silinenGorev görevi de kaldırıldı.";
             }
+            log_action($db, $user, 'sablon_sil', 'sablon', $id, $silinenGorev > 0 ? "bekleyen $silinenGorev görev de silindi" : null);
             json_out(200, ["message" => $msg]);
         }
 
@@ -118,6 +119,7 @@ if ($method === 'POST') {
             if ($stmt->rowCount() === 0) {
                 json_out(404, ["message" => "Şablon bulunamadı veya durum zaten aynı."]);
             }
+            log_action($db, $user, 'sablon_aktif_degistir', 'sablon', $id);
             json_out(200, ["message" => "Şablon durumu güncellendi."]);
         }
 
@@ -137,6 +139,7 @@ if ($method === 'POST') {
             if ($yeni === 0) {
                 json_out(409, ["message" => "Bu şablondan bugün zaten iş emri üretilmiş. Aynı gün tekrar üretilmez."]);
             }
+            log_action($db, $user, 'sablondan_uret', 'sablon', $id, "is_emri_id: $yeni");
             json_out(201, ["message" => "İş emri oluşturuldu ve personele atandı.", "is_emri_id" => $yeni]);
         }
 
@@ -159,6 +162,7 @@ if ($method === 'POST') {
                 ':ag' => $g['alt_gorevler'], ':tt' => $g['tekrar_tipi'], ':tg' => $g['tekrar_gunu'],
                 ':id' => $id, ':fid' => $firma_id,
             ]);
+            log_action($db, $user, 'sablon_guncelle', 'sablon', $id);
             json_out(200, ["message" => "Şablon güncellendi."]);
         }
 
@@ -184,7 +188,9 @@ if ($method === 'POST') {
         ':tekrar_gunu'  => $g['tekrar_gunu'],
     ]);
 
-    json_out(201, ["message" => "Periyodik görev şablonu oluşturuldu.", "id" => (int)$db->lastInsertId()]);
+    $yeniSablonId = (int)$db->lastInsertId();
+    log_action($db, $user, 'sablon_ekle', 'sablon', $yeniSablonId, $g['baslik']);
+    json_out(201, ["message" => "Periyodik görev şablonu oluşturuldu.", "id" => $yeniSablonId]);
 }
 
 json_out(405, ["message" => "Desteklenmeyen metot."]);

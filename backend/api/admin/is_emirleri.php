@@ -73,6 +73,7 @@ if ($method === 'POST') {
             if ($stmt->rowCount() === 0) {
                 json_out(404, ["message" => "İş emri bulunamadı."]);
             }
+            log_action($db, $user, 'is_emri_sil', 'is_emri', $id);
             json_out(200, ["message" => "İş emri silindi."]);
         }
 
@@ -105,6 +106,7 @@ if ($method === 'POST') {
                 ':s' => $site_id, ':p' => $personel_id, ':b' => $baslik, ':a' => $aciklama,
                 ':q' => $qr_kod, ':pl' => $planlanan, ':id' => $id, ':fid' => $firma_id,
             ]);
+            log_action($db, $user, 'is_emri_guncelle', 'is_emri', $id);
             json_out(200, ["message" => "İş emri güncellendi."]);
         }
 
@@ -159,6 +161,7 @@ if ($method === 'POST') {
         // Sessizce yut; bildirim opsiyoneldir.
     }
 
+    log_action($db, $user, 'is_emri_ekle', 'is_emri', $yeni_id, $baslik);
     json_out(201, ["message" => "İş emri oluşturuldu ve personele atandı.", "id" => $yeni_id]);
 }
 

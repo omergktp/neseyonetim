@@ -45,3 +45,21 @@ function read_json_body() {
     $data = json_decode($raw);
     return $data ?: new stdClass();
 }
+
+// Denetim izi (audit log): "kim, ne zaman, neyi yaptı" kaydı.
+// Log yazılamaması asıl işlemi ASLA bozmamalı — hatalar sessizce yutulur.
+function log_action(PDO $db, $user, string $eylem, ?string $hedefTip = null, ?int $hedefId = null, ?string $detay = null): void {
+    try {
+        $stmt = $db->prepare("INSERT INTO audit_log (firma_id, personel_id, eylem, hedef_tip, hedef_id, detay, ip)
+                              VALUES (:fid, :pid, :eylem, :htip, :hid, :detay, :ip)");
+        $stmt->execute([
+            ':fid'   => $user->firma_id,
+            ':pid'   => $user->personel_id ?? null,
+            ':eylem' => $eylem,
+            ':htip'  => $hedefTip,
+            ':hid'   => $hedefId,
+            ':detay' => $detay,
+            ':ip'    => $_SERVER['REMOTE_ADDR'] ?? null,
+        ]);
+    } catch (Throwable $e) { /* loglama asıl işlemi engellemesin */ }
+}

@@ -67,4 +67,5 @@ if ($teknik_id !== null) {
     } catch (Throwable $e) { /* bildirim opsiyonel */ }
 }
 
+log_action($db, $user, 'ariza_ekle', 'ariza', $yeni_id);
 json_out(201, ["message" => "Arıza oluşturuldu.", "id" => $yeni_id]);

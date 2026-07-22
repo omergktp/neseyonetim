@@ -67,6 +67,7 @@ if ($method === 'POST') {
             }
             $del = $db->prepare("DELETE FROM siteler WHERE id = :id AND firma_id = :fid");
             $del->execute([':id' => $id, ':fid' => $firma_id]);
+            log_action($db, $user, 'site_sil', 'site', $id);
             json_out(200, ["message" => "Tesis silindi."]);
         }
 
@@ -74,6 +75,7 @@ if ($method === 'POST') {
             $kod = yeniSiteQr($db);
             $upd = $db->prepare("UPDATE siteler SET qr_kod = :k WHERE id = :id AND firma_id = :fid");
             $upd->execute([':k' => $kod, ':id' => $id, ':fid' => $firma_id]);
+            log_action($db, $user, 'site_qr_yenile', 'site', $id);
             json_out(200, ["message" => "Yeni QR üretildi.", "qr_kod" => $kod]);
         }
 
@@ -94,6 +96,7 @@ if ($method === 'POST') {
                 ':ad' => $ad, ':adres' => $adres, ':enlem' => $enlem, ':boylam' => $boylam,
                 ':id' => $id, ':fid' => $firma_id,
             ]);
+            log_action($db, $user, 'site_guncelle', 'site', $id);
             json_out(200, ["message" => "Tesis güncellendi."]);
         }
 
@@ -125,7 +128,9 @@ if ($method === 'POST') {
         ':qr_kod' => $qr_kod,
     ]);
 
-    json_out(201, ["message" => "Site eklendi.", "id" => (int)$db->lastInsertId(), "qr_kod" => $qr_kod]);
+    $yeniSiteId = (int)$db->lastInsertId();
+    log_action($db, $user, 'site_ekle', 'site', $yeniSiteId, $ad);
+    json_out(201, ["message" => "Site eklendi.", "id" => $yeniSiteId, "qr_kod" => $qr_kod]);
 }
 
 json_out(405, ["message" => "Desteklenmeyen metot."]);

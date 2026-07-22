@@ -154,3 +154,33 @@ CREATE TABLE IF NOT EXISTS periyodik_sablonlar (
 -- Şablon silinince üretilmiş iş emirleri SET NULL olur (FK kopmaz; bekleyenler API tarafında ayrıca silinir).
 ALTER TABLE is_emirleri
     ADD CONSTRAINT fk_ie_sablon FOREIGN KEY (sablon_id) REFERENCES periyodik_sablonlar(id) ON DELETE SET NULL;
+
+-- 9. DENETİM İZİ (AUDIT LOG) TABLOSU
+-- Para/yetki/iş durumu değiştiren admin işlemlerinin "kim, ne zaman, neyi" kaydı.
+-- backend/core/bootstrap.php içindeki log_action() yardımcısıyla yazılır.
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    firma_id INT NOT NULL,
+    personel_id INT NULL,
+    eylem VARCHAR(60) NOT NULL,        -- ör: masraf_onay, personel_sil, ariza_guncelle
+    hedef_tip VARCHAR(40) NULL,        -- ör: masraf, personel, ariza, is_emri, site
+    hedef_id INT NULL,
+    detay TEXT NULL,                   -- serbest açıklama / JSON
+    ip VARCHAR(45) NULL,
+    olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_al_firma_tarih (firma_id, olusturma_tarihi),
+    INDEX idx_al_firma_eylem (firma_id, eylem)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. PERFORMANS İNDEKSLERİ
+-- Multi-tenant sorguların tamamı firma_id + durum/tarih ile filtrelenir;
+-- firma sayısı arttığında panel ve raporların yavaşlamaması için bileşik indeksler.
+ALTER TABLE is_emirleri
+    ADD INDEX idx_ie_firma_durum (firma_id, durum),
+    ADD INDEX idx_ie_firma_personel_durum (firma_id, personel_id, durum),
+    ADD INDEX idx_ie_firma_tamamlanma (firma_id, tamamlanma_tarihi);
+ALTER TABLE arizalar
+    ADD INDEX idx_ar_firma_durum (firma_id, durum);
+ALTER TABLE malzeme_talepleri
+    ADD INDEX idx_mt_firma_durum (firma_id, durum),
+    ADD INDEX idx_mt_firma_tarih (firma_id, olusturma_tarihi);

@@ -68,6 +68,7 @@ if ($method === 'POST') {
         if ($del->rowCount() === 0) {
             json_out(404, ["message" => "Masraf bulunamadı."]);
         }
+        log_action($db, $user, 'masraf_sil', 'masraf', $id);
         json_out(200, ["message" => "Masraf silindi."]);
     }
 
@@ -84,6 +85,7 @@ if ($method === 'POST') {
     if ($stmt->rowCount() === 0) {
         json_out(404, ["message" => "Masraf bulunamadı veya zaten güncellenmiş."]);
     }
+    log_action($db, $user, 'masraf_' . $islem, 'masraf', $id, "yeni durum: $yeni_durum");
     json_out(200, ["message" => $yeni_durum === 'onaylandi' ? "Masraf onaylandı." : "Masraf reddedildi."]);
 }
 

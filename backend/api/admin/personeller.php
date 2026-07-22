@@ -49,6 +49,7 @@ if ($method === 'POST') {
             }
             $upd = $db->prepare("UPDATE personeller SET aktif = 1 - aktif WHERE id = :id AND firma_id = :fid");
             $upd->execute([':id' => $id, ':fid' => $firma_id]);
+            log_action($db, $user, 'personel_aktif_degistir', 'personel', $id);
             json_out(200, ["message" => "Personel durumu güncellendi."]);
         }
 
@@ -70,6 +71,7 @@ if ($method === 'POST') {
             }
             $del = $db->prepare("DELETE FROM personeller WHERE id = :id AND firma_id = :fid");
             $del->execute([':id' => $id, ':fid' => $firma_id]);
+            log_action($db, $user, 'personel_sil', 'personel', $id);
             json_out(200, ["message" => "Personel silindi."]);
         }
 
@@ -97,6 +99,7 @@ if ($method === 'POST') {
                                          WHERE id = :id AND firma_id = :fid");
                     $upd->execute([':a' => $ad_soyad, ':t' => $telefon, ':r' => $rol, ':id' => $id, ':fid' => $firma_id]);
                 }
+                log_action($db, $user, 'personel_guncelle', 'personel', $id, $sifreVar ? 'şifre de değiştirildi' : null);
                 json_out(200, ["message" => "Personel güncellendi."]);
             } catch (PDOException $e) {
                 if ($e->getCode() === '23000') {
@@ -136,7 +139,9 @@ if ($method === 'POST') {
         $stmt->bindParam(':rol', $rol);
         $stmt->execute();
 
-        json_out(201, ["message" => "Personel eklendi.", "id" => (int)$db->lastInsertId()]);
+        $yeniId = (int)$db->lastInsertId();
+        log_action($db, $user, 'personel_ekle', 'personel', $yeniId, "rol: $rol");
+        json_out(201, ["message" => "Personel eklendi.", "id" => $yeniId]);
     } catch (PDOException $e) {
         // UNIQUE (firma_id, telefon) ihlali
         if ($e->getCode() === '23000') {
