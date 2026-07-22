@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesis Raporu - Glow Saha</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('glow_theme');
+                if (t === 'dark' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches))
+                    document.documentElement.classList.add('dark');
+            } catch (e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Koyu tema yalnızca ekranda ve A4 kağıdı DIŞINDA uygulanır (kağıt daima beyaz/yazdırılabilir kalır) */
+        html.dark body { background-color: #0b1120; }
+        html.dark .no-print.bg-white { background-color: #161f30; border-color: #25324a; }
+        html.dark .no-print .text-slate-800 { color: #e2e8f0; }
+        html.dark .no-print .text-slate-500 { color: #94a3b8; }
+        html.dark .no-print input, html.dark .no-print select { background-color: #0e1726; border-color: #2b3a55; color: #e2e8f0; }
+        html.dark .no-print select option { background-color: #161f30; color: #e2e8f0; }
+        html.dark .theme-btn { color: #94a3b8; }
+        html.dark .theme-btn:hover { color: #e2e8f0; background-color: #25324a; }
+
+        /* Yazıcı (PDF) Optimizasyonu */
+        @media print {
+            body { background: white; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+            @page { size: A4; margin: 18mm; }
+            /* Kağıt kabını yazdırmada gölgesiz/kenarlıksız ve tam genişlikte göster */
+            .rapor-kagit { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; min-height: auto !important; }
+            /* Tablo satırları sayfa ortasında bölünmesin, başlık her sayfada tekrarlansın */
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 p-8">
+
+    <!-- Kontrol Paneli (Yazıcıda gizlenir) -->
+    <div class="max-w-4xl mx-auto bg-white p-4 rounded-lg shadow-sm mb-8 flex flex-col sm:flex-row sm:flex-wrap sm:justify-between sm:items-end gap-4 no-print">
+        <div>
+            <h2 class="text-lg font-bold text-slate-800">Rapor Önizleme</h2>
+            <p class="text-sm text-slate-500">Dönem ve tesis seçip raporu oluşturun, ardından "Yazdır" ile PDF alın.</p>
+        </div>
+        <div class="flex items-end gap-3">
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Dönem</label>
+                <input id="ay-secici" type="month" class="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Tesis</label>
+                <select id="site-secici" class="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    <option value="">Tüm Tesisler</option>
+                </select>
+            </div>
+            <button onclick="toggleTheme()" title="Açık / koyu tema" class="theme-btn w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors self-end">
+                <i id="theme-ico" class="fa-solid fa-moon text-lg"></i>
+            </button>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Yazdır
+            </button>
+        </div>
+    </div>
+
+    <!-- A4 Rapor Kağıdı -->
+    <div class="rapor-kagit max-w-4xl mx-auto bg-white border border-slate-200 shadow-xl p-6 sm:p-12 min-h-[297mm]">
+        
+        <!-- Rapor Başlığı / Antet -->
+        <div class="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-8">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                    G
+                </div>
+                <div>
+                    <h1 id="rapor-firma" class="text-3xl font-bold text-slate-900 tracking-tight">-</h1>
+                    <p class="text-slate-500 font-medium">Aylık Tesis ve Saha Faaliyet Raporu</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-bold text-slate-800">Dönem: <span id="rapor-donem" class="font-normal text-slate-600">-</span></p>
+                <p class="text-sm font-bold text-slate-800 mt-1">Tesis: <span id="rapor-tesis" class="font-normal text-slate-600">-</span></p>
+                <p class="text-sm font-bold text-slate-800 mt-1">Rapor No: <span id="rapor-no" class="font-normal text-slate-600">-</span></p>
+            </div>
+        </div>
+
+        <!-- Yönetici Özeti -->
+        <div class="mb-10">
+            <h3 class="text-lg font-bold text-slate-800 mb-3 bg-slate-100 p-2 rounded">Yönetici Özeti</h3>
+            <p id="rapor-ozet" class="text-slate-600 text-sm leading-relaxed">-</p>
+        </div>
+
+        <!-- İstatistikler -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10">
+            <div class="border border-slate-200 p-4 rounded-lg text-center bg-blue-50/50">
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Tamamlanan Görev</p>
+                <p id="rapor-stat-gorev" class="text-3xl font-bold text-blue-600 mt-1">-</p>
+            </div>
+            <div class="border border-slate-200 p-4 rounded-lg text-center bg-red-50/50">
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Çözülen Arıza</p>
+                <p id="rapor-stat-ariza" class="text-3xl font-bold text-red-600 mt-1">-</p>
+            </div>
+            <div class="border border-slate-200 p-4 rounded-lg text-center bg-emerald-50/50">
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Toplam Masraf (TL)</p>
+                <p id="rapor-stat-masraf" class="text-3xl font-bold text-emerald-600 mt-1">-</p>
+            </div>
+        </div>
+
+        <!-- Detaylı Tablo -->
+        <h3 class="text-lg font-bold text-slate-800 mb-3 bg-slate-100 p-2 rounded">Son İşlemler ve Masraflar</h3>
+        <div class="overflow-x-auto mb-8">
+        <table class="w-full text-left border-collapse border border-slate-200">
+            <thead>
+                <tr class="bg-slate-50 text-slate-800 text-sm border-b border-slate-200">
+                    <th class="p-3 border-r border-slate-200">Tarih</th>
+                    <th class="p-3 border-r border-slate-200">Personel</th>
+                    <th class="p-3 border-r border-slate-200">İşlem / Kalem</th>
+                    <th class="p-3 text-right">Tutar</th>
+                </tr>
+            </thead>
+            <tbody id="rapor-masraf-tbody" class="text-sm text-slate-600">
+                <tr><td colspan="4" class="p-3 text-center text-slate-500">Yükleniyor...</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <!-- İmzalar -->
+        <div class="mt-20 flex justify-between px-10">
+            <div class="text-center">
+                <p class="font-bold text-slate-800 border-b border-slate-300 pb-1 px-8 mb-2">Hazırlayan</p>
+                <p class="text-sm text-slate-500">Sistem Otomasyonu</p>
+            </div>
+            <div class="text-center">
+                <p class="font-bold text-slate-800 border-b border-slate-300 pb-1 px-8 mb-2">Onaylayan</p>
+                <p class="text-sm text-slate-500">Tesis Yöneticisi</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API = '../backend/api';
+        const token = localStorage.getItem('glow_token');
+        if (!token) { window.location.href = 'index.html'; }
+
+        // Tema (açık/koyu) — dashboard ile aynı tercihi paylaşır
+        function _temaIko() {
+            const dark = document.documentElement.classList.contains('dark');
+            const i = document.getElementById('theme-ico');
+            if (i) i.className = `fa-solid ${dark ? 'fa-sun' : 'fa-moon'} text-lg`;
+        }
+        function toggleTheme() {
+            const dark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('glow_theme', dark ? 'dark' : 'light'); } catch (_) {}
+            _temaIko();
+        }
+        _temaIko();
+
+        async function apiFetch(path) {
+            const res = await fetch(`${API}/${path}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (res.status === 401 || res.status === 403) {
+                localStorage.clear();
+                window.location.href = 'index.html';
+                throw new Error('Yetkisiz');
+            }
+            return res;
+        }
+
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        }
+
+        const para = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+
+        const AY_ADLARI = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+        function donemMetni(month) {
+            const [y, m] = month.split('-');
+            return `${AY_ADLARI[parseInt(m, 10) - 1]} ${y}`;
+        }
+
+        // Tesis seçiciyi doldur
+        async function loadSiteler() {
+            try {
+                const res = await apiFetch('admin/siteler.php');
+                const siteler = (await res.json()).data || [];
+                const sel = document.getElementById('site-secici');
+                siteler.forEach(s => {
+                    const o = document.createElement('option');
+                    o.value = s.id;
+                    o.textContent = s.ad;
+                    sel.appendChild(o);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadRapor() {
+            const ay = document.getElementById('ay-secici').value;
+            const siteId = document.getElementById('site-secici').value;
+            if (!ay) return;
+
+            const tbody = document.getElementById('rapor-masraf-tbody');
+            tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-500">Yükleniyor...</td></tr>`;
+
+            try {
+                let path = `admin/rapor.php?month=${encodeURIComponent(ay)}`;
+                if (siteId) path += `&site_id=${encodeURIComponent(siteId)}`;
+                const res = await apiFetch(path);
+                const data = await res.json();
+                const s = data.istatistik;
+
+                document.getElementById('rapor-firma').innerText = data.firma_ad || 'Firma';
+                document.getElementById('rapor-donem').innerText = donemMetni(data.donem);
+                document.getElementById('rapor-tesis').innerText = data.site_ad || 'Tüm Tesisler';
+                document.getElementById('rapor-no').innerText = `RP-${data.donem}`;
+
+                document.getElementById('rapor-stat-gorev').innerText = s.tamamlanan_gorev;
+                document.getElementById('rapor-stat-ariza').innerText = s.cozulen_ariza;
+                document.getElementById('rapor-stat-masraf').innerText = para(s.toplam_masraf);
+
+                document.getElementById('rapor-ozet').innerHTML =
+                    `Bu rapor, <strong class="text-slate-800">${esc(data.site_ad)}</strong> kapsamında ` +
+                    `<strong class="text-slate-800">${esc(donemMetni(data.donem))}</strong> dönemi içerisinde gerçekleştirilen ` +
+                    `teknik bakım, onarım, temizlik ve malzeme giderlerini özetlemektedir. İlgili dönemde toplam ` +
+                    `<strong class="text-slate-800">${s.tamamlanan_gorev} iş emri</strong> tamamlanmış, ` +
+                    `<strong class="text-slate-800">${s.cozulen_ariza} arıza</strong> çözülmüştür.`;
+
+                const masraflar = data.masraflar || [];
+                if (masraflar.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-500">Bu dönemde masraf kaydı yok.</td></tr>`;
+                } else {
+                    let html = masraflar.map((r, i) => `
+                        <tr class="border-b border-slate-200 ${i % 2 ? 'bg-slate-50/30' : ''}">
+                            <td class="p-3 border-r border-slate-200">${new Date((r.olusturma_tarihi||'').replace(' ','T')).toLocaleDateString('tr-TR')}</td>
+                            <td class="p-3 border-r border-slate-200">${esc(r.personel_adi || '-')}${r.personel_rol ? ` (${esc(r.personel_rol)})` : ''}</td>
+                            <td class="p-3 border-r border-slate-200">${esc(r.kalem_adi)}</td>
+                            <td class="p-3 text-right font-medium">${para(r.tutar)}</td>
+                        </tr>`).join('');
+                    html += `<tr class="bg-slate-100 text-slate-800 font-bold">
+                                <td colspan="3" class="p-3 text-right border-r border-slate-200">TOPLAM:</td>
+                                <td class="p-3 text-right">${para(s.toplam_masraf)}</td>
+                             </tr>`;
+                    tbody.innerHTML = html;
+                }
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-red-600">Rapor yüklenemedi.</td></tr>`;
+            }
+        }
+
+        // Başlat: içinde bulunulan ayı seç, listeleri yükle, URL'deki tesisi ön seç
+        (async function init() {
+            const params = new URLSearchParams(window.location.search);
+            const now = new Date();
+            const ay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const aySecici = document.getElementById('ay-secici');
+            aySecici.value = ay;
+            aySecici.addEventListener('change', loadRapor);
+            document.getElementById('site-secici').addEventListener('change', loadRapor);
+            await loadSiteler();
+            const preSite = params.get('site_id');
+            if (preSite) document.getElementById('site-secici').value = preSite;
+            loadRapor();
+        })();
+    </script>
+</body>
+</html>

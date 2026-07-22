@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Glow Saha</title>
+    <!-- Tema tercihini ilk boyamadan önce uygula (FOUC engeli) -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('glow_theme');
+                if (t === 'dark' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches))
+                    document.documentElement.classList.add('dark');
+            } catch (e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }
+    </script>
+    <style>
+        html { color-scheme: light; }
+        html.dark { color-scheme: dark; }
+
+        /* Modal açılış animasyonu */
+        @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+        .modal.flex > div { animation: modalIn .18s ease-out; }
+
+        /* Erişilebilir odak halkası ve dokunma geri bildirimi (tüm buton/linkler) */
+        button:focus-visible, a:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 8px; }
+        button { transition: transform .08s ease, background-color .15s ease, box-shadow .15s ease; }
+        button:active:not(:disabled) { transform: scale(.97); }
+        body, .bg-white, aside, header, section { transition: background-color .2s ease, border-color .2s ease, color .2s ease; }
+
+        /* İnce kaydırma çubuğu */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Yükleniyor dönen ikon */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { display:inline-block; width:18px; height:18px; border:2.5px solid #cbd5e1; border-top-color:#3b82f6; border-radius:50%; animation: spin .7s linear infinite; }
+
+        /* ===== Skeleton (iskelet) yükleme ===== */
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .skel { display:inline-block; background: linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 37%,#e2e8f0 63%); background-size: 200% 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 14px; }
+
+        /* ===== Toast bildirimleri ===== */
+        #toastWrap { position: fixed; top: 1rem; right: 1rem; z-index: 100; display:flex; flex-direction:column; gap:.6rem; max-width: 360px; }
+        @keyframes toastIn { from { opacity:0; transform: translateX(24px) scale(.96); } to { opacity:1; transform:none; } }
+        @keyframes toastOut { to { opacity:0; transform: translateX(24px) scale(.96); } }
+        .toast { animation: toastIn .22s cubic-bezier(.2,.8,.2,1); }
+        .toast.hide { animation: toastOut .2s ease forwards; }
+
+        /* ===== Sıralanabilir tablo başlığı ===== */
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: #3b82f6; }
+        th.sortable .sort-ico { opacity: .35; margin-left: 4px; font-size: .7rem; }
+        th.sortable.asc .sort-ico, th.sortable.desc .sort-ico { opacity: 1; color: #3b82f6; }
+
+        /* ===================================================================
+           KOYU TEMA — yüksek özgüllüklü override (HTML/JS sınıflarına dokunmadan)
+           =================================================================== */
+        .dark body, .dark .bg-slate-50 { background-color: #0b1120; }
+        .dark .bg-white { background-color: #161f30; }
+        .dark aside.bg-slate-900 { background-color: #080d18; }
+        .dark .border-slate-800 { border-color: #1c2740; }
+
+        .dark .text-slate-900 { color: #f1f5f9; }
+        .dark .text-slate-800 { color: #e2e8f0; }
+        .dark .text-slate-700 { color: #cbd5e1; }
+        .dark .text-slate-600 { color: #9fb0c4; }
+        .dark .text-slate-500 { color: #8da0b6; }
+        .dark .text-slate-400 { color: #64748b; }
+
+        .dark .border-slate-100, .dark .border-slate-200 { border-color: #25324a; }
+        .dark .border-slate-100\/50 { border-color: rgba(148,163,184,.12); }
+        .dark .bg-slate-50\/50 { background-color: rgba(148,163,184,.04); }
+        .dark .hover\:bg-slate-50\/50:hover { background-color: rgba(148,163,184,.06); }
+        .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(148,163,184,.12); }
+
+        /* Form alanları */
+        .dark input, .dark select, .dark textarea { background-color: #0e1726; border-color: #2b3a55; color: #e2e8f0; }
+        .dark input::placeholder, .dark textarea::placeholder { color: #5b6b82; }
+        .dark select option { background-color: #161f30; color: #e2e8f0; }
+
+        /* Nötr buton/rozet zeminleri */
+        .dark .bg-slate-100 { background-color: #25324a; }
+        .dark .hover\:bg-slate-100:hover { background-color: #2d3c58; }
+        .dark .hover\:bg-slate-200:hover { background-color: #34465f; }
+        .dark .bg-slate-200 { background-color: #2b3a55; }
+
+        /* Yumuşak renkli rozet zeminleri + metinleri (koyuda okunur tonlar) */
+        .dark .bg-emerald-50 { background-color: rgba(16,185,129,.14); }  .dark .text-emerald-600, .dark .text-emerald-500 { color: #34d399; }
+        .dark .bg-amber-50   { background-color: rgba(245,158,11,.14); }  .dark .text-amber-600, .dark .text-amber-700 { color: #fbbf24; }
+        .dark .bg-red-50     { background-color: rgba(248,113,113,.14); } .dark .text-red-600, .dark .text-red-500 { color: #f87171; }
+        .dark .bg-blue-50    { background-color: rgba(59,130,246,.16); }  .dark .text-blue-600, .dark .text-blue-700 { color: #60a5fa; }
+        .dark .bg-violet-50  { background-color: rgba(139,92,246,.16); }  .dark .text-violet-700 { color: #a78bfa; }
+        .dark .bg-purple-50  { background-color: rgba(168,85,247,.16); }  .dark .text-purple-600 { color: #c084fc; }
+        .dark .hover\:text-slate-700:hover { color: #cbd5e1; }
+        .dark .hover\:text-slate-800:hover { color: #e2e8f0; }
+        .dark .hover\:text-blue-700:hover { color: #93c5fd; }
+
+        /* Kart gölgeleri koyuda daha derin */
+        .dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+        .dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,.7); }
+
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 font-['Inter'] text-slate-800 flex h-screen overflow-hidden">
+
+    <!-- Sidebar (mobilde off-canvas) -->
+    <aside id="sidebar" class="w-64 bg-slate-900 text-white flex flex-col transition-transform duration-200 fixed lg:static inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0">
+        <div class="h-16 flex items-center px-6 border-b border-slate-800">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-bold mr-3 shadow-lg shadow-purple-500/20">G</div>
+            <span class="text-lg font-bold tracking-tight">GLOW SAHA</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <nav class="space-y-1 px-3">
+                <a id="nav-dashboard" href="#" onclick="switchView('dashboard'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i><span class="font-medium text-sm">Dashboard</span>
+                </a>
+                <a id="nav-personeller" href="#" onclick="switchView('personeller'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-users w-5 text-center"></i><span class="font-medium text-sm">Personeller</span>
+                </a>
+                <a id="nav-siteler" href="#" onclick="switchView('siteler'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-building w-5 text-center"></i><span class="font-medium text-sm">Siteler / Tesisler</span>
+                </a>
+                <a id="nav-isemirleri" href="#" onclick="switchView('isemirleri'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-clipboard-list w-5 text-center"></i><span class="font-medium text-sm">İş Emirleri</span>
+                </a>
+                <a id="nav-arizalar" href="#" onclick="switchView('arizalar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-wrench w-5 text-center"></i><span class="font-medium text-sm">Arıza Kayıtları</span>
+                </a>
+                <a id="nav-masraflar" href="#" onclick="switchView('masraflar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-receipt w-5 text-center"></i><span class="font-medium text-sm">Masraflar</span>
+                </a>
+                <a id="nav-periyodik" href="#" onclick="switchView('periyodik'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-repeat w-5 text-center"></i><span class="font-medium text-sm">Periyodik Görevler</span>
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-slate-800">
+            <a href="index.html" onclick="localStorage.clear();" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer">
+                <i class="fa-solid fa-right-from-bracket w-5 text-center"></i><span class="font-medium text-sm">Çıkış Yap</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Mobil sidebar arka planı -->
+    <div id="sidebarBackdrop" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 z-10">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar(true)" aria-label="Menüyü aç" class="lg:hidden text-slate-500 hover:text-slate-800 p-1"><i class="fa-solid fa-bars text-xl"></i></button>
+                <h2 id="page-title" class="text-xl font-semibold text-slate-800">Dashboard</h2>
+            </div>
+            <div class="flex items-center gap-3 sm:gap-4">
+                <button id="themeToggle" onclick="toggleTheme()" aria-label="Tema değiştir" title="Açık / koyu tema"
+                    class="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
+                    <i class="fa-solid fa-moon text-lg"></i>
+                </button>
+                <div class="w-px h-8 bg-slate-200 hidden sm:block"></div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right hidden sm:block">
+                        <p id="user-name" class="text-sm font-semibold text-slate-800">-</p>
+                        <p class="text-xs text-slate-500">Yönetici</p>
+                    </div>
+                    <div id="user-avatar" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-center font-bold shadow-sm">?</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-auto p-8">
+
+            <!-- ============ DASHBOARD ============ -->
+            <section id="view-dashboard">
+                <div class="flex flex-wrap justify-between items-end gap-4 mb-8">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">Genel Bakış</h1>
+                        <p class="text-slate-500 mt-1">Firmanıza ait tesislerin güncel durumu.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <select id="dashboard-site-filter" onchange="loadDashboard()" class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                            <option value="">Tüm Tesisler</option>
+                        </select>
+                        <a href="#" onclick="acAylikRapor(); return false;" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium transition-all active:scale-95 flex items-center gap-2">
+                            <i class="fa-solid fa-file-pdf text-red-400"></i> Aylık Rapor
+                        </a>
+                        <button onclick="openIsEmriModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm shadow-blue-500/30 font-medium transition-all active:scale-95 flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Yeni İş Emri
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
+                        <div class="w-14 h-14 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-clipboard-check"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium mb-1">Tamamlanan İş</p><h3 id="stat-tamamlanan" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
+                        <div class="w-14 h-14 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-spinner"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium mb-1">Devam Eden İş</p><h3 id="stat-devam" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
+                        <div class="w-14 h-14 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-2xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium mb-1">Açık Arızalar</p><h3 id="stat-ariza" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
+                        <div class="w-14 h-14 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl"><i class="fa-solid fa-users"></i></div>
+                        <div><p class="text-sm text-slate-500 font-medium mb-1">Aktif Personel</p><h3 id="stat-personel" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                </div>
+
+                <!-- Tesisler Özeti -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-slate-800">Tesisler Özeti</h2>
+                        <span class="text-sm text-slate-400">Bir tesise tıklayarak odaklan</span>
+                    </div>
+                    <div id="tesisler-ozet" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="text-slate-400 text-sm">Yükleniyor...</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">Son İş Emirleri</h2>
+                        <a href="#" onclick="switchView('isemirleri'); return false;" class="text-sm font-medium text-blue-600 hover:text-blue-700">Tümünü Gör <i class="fa-solid fa-arrow-right ml-1"></i></a>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                                <th class="px-6 py-4 font-medium">Görev Başlığı</th><th class="px-6 py-4 font-medium">Site/Tesis</th>
+                                <th class="px-6 py-4 font-medium">Personel</th><th class="px-6 py-4 font-medium">Durum</th><th class="px-6 py-4 font-medium">Tarih</th>
+                            </tr></thead>
+                            <tbody id="son-isler-tbody" class="text-sm divide-y divide-slate-100">
+                                <tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">Yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ PERSONELLER ============ -->
+            <section id="view-personeller" class="hidden">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">Personeller</h1><p class="text-slate-500 mt-1">Firmanızdaki saha ve yönetici personelleri.</p></div>
+                    <div class="flex items-center gap-3">
+                        <div id="arama-personeller"></div>
+                        <button onclick="openPersonelModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-user-plus"></i> Personel Ekle</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="personeller" data-key="ad_soyad" onclick="tabloSirala('personeller','ad_soyad',renderPersoneller)">Ad Soyad <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="personeller" data-key="telefon" onclick="tabloSirala('personeller','telefon',renderPersoneller)">Telefon <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="personeller" data-key="rol" onclick="tabloSirala('personeller','rol',renderPersoneller)">Rol <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="personeller" data-key="aktif" onclick="tabloSirala('personeller','aktif',renderPersoneller)">Durum <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="personeller-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+            <!-- ============ SİTELER ============ -->
+            <section id="view-siteler" class="hidden">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">Siteler / Tesisler</h1><p class="text-slate-500 mt-1">Hizmet verdiğiniz tesisler ve konumları.</p></div>
+                    <div class="flex items-center gap-3">
+                        <div id="arama-siteler"></div>
+                        <button onclick="openSiteModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Site Ekle</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="siteler" data-key="ad" onclick="tabloSirala('siteler','ad',renderSiteler)">Tesis Adı <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="siteler" data-key="adres" onclick="tabloSirala('siteler','adres',renderSiteler)">Adres <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium">Konum (Enlem, Boylam)</th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="siteler-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+            <!-- ============ İŞ EMİRLERİ ============ -->
+            <section id="view-isemirleri" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">İş Emirleri</h1><p class="text-slate-500 mt-1">Tüm görev atamaları ve durumları.</p></div>
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <div id="arama-isemirleri"></div>
+                        <select id="isemri-filtre" onchange="loadIsEmirleri()" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none">
+                            <option value="">Tüm Durumlar</option><option value="bekliyor">Bekliyor</option><option value="devam_ediyor">Devam Ediyor</option>
+                            <option value="tamamlandi">Tamamlandı</option><option value="iptal">İptal</option>
+                        </select>
+                        <button onclick="openIsEmriModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Yeni İş Emri</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="isemirleri" data-key="baslik" onclick="tabloSirala('isemirleri','baslik',renderIsEmirleri)">Görev Başlığı <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="isemirleri" data-key="site_adi" onclick="tabloSirala('isemirleri','site_adi',renderIsEmirleri)">Site/Tesis <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="isemirleri" data-key="personel_adi" onclick="tabloSirala('isemirleri','personel_adi',renderIsEmirleri)">Personel <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="isemirleri" data-key="durum" onclick="tabloSirala('isemirleri','durum',renderIsEmirleri)">Durum <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="isemirleri" data-key="olusturma_tarihi" onclick="tabloSirala('isemirleri','olusturma_tarihi',renderIsEmirleri)">Oluşturulma <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="isemirleri-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+            <!-- ============ ARIZALAR ============ -->
+            <section id="view-arizalar" class="hidden">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">Arıza Kayıtları</h1><p class="text-slate-500 mt-1">Sahadan bildirilen arızalar ve çözüm durumları.</p></div>
+                    <div class="flex items-center gap-3">
+                        <div id="arama-arizalar"></div>
+                        <button onclick="openArizaEkleModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Yeni Arıza</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="arizalar" data-key="baslik" onclick="tabloSirala('arizalar','baslik',renderArizalar)">Başlık <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="arizalar" data-key="site_adi" onclick="tabloSirala('arizalar','site_adi',renderArizalar)">Site/Tesis <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="arizalar" data-key="bildiren_adi" onclick="tabloSirala('arizalar','bildiren_adi',renderArizalar)">Bildiren <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="arizalar" data-key="teknik_adi" onclick="tabloSirala('arizalar','teknik_adi',renderArizalar)">Teknik <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="arizalar" data-key="durum" onclick="tabloSirala('arizalar','durum',renderArizalar)">Durum <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="arizalar-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+            <!-- ============ MASRAFLAR ============ -->
+            <section id="view-masraflar" class="hidden">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">Masraflar</h1><p class="text-slate-500 mt-1">Sahadan gelen masraf/malzeme talepleri ve onay durumları.</p></div>
+                    <div class="flex items-center gap-3">
+                        <div id="arama-masraflar"></div>
+                        <select id="masraf-filtre" onchange="loadMasraflar()" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none">
+                            <option value="">Tüm Durumlar</option><option value="bekliyor">Bekliyor</option><option value="onaylandi">Onaylandı</option><option value="reddedildi">Reddedildi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="masraflar" data-key="kalem_adi" onclick="tabloSirala('masraflar','kalem_adi',renderMasraflar)">Kalem <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="masraflar" data-key="personel_adi" onclick="tabloSirala('masraflar','personel_adi',renderMasraflar)">Personel <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium">İlgili İş/Arıza</th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="masraflar" data-key="tutar" onclick="tabloSirala('masraflar','tutar',renderMasraflar)">Tutar <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium">Fiş</th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="masraflar" data-key="durum" onclick="tabloSirala('masraflar','durum',renderMasraflar)">Durum <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="masraflar-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+            <!-- ============ PERİYODİK GÖREVLER ============ -->
+            <section id="view-periyodik" class="hidden">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <div><h1 class="text-2xl font-bold text-slate-900">Periyodik Görevler</h1><p class="text-slate-500 mt-1">Tekrarlayan görev şablonları. Her gece otomatik iş emrine dönüşür.</p></div>
+                    <div class="flex items-center gap-3">
+                        <div id="arama-periyodik"></div>
+                        <button onclick="openPeriyodikModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-sm font-medium flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Yeni Şablon</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100/50 overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-slate-50/50 text-slate-500 text-sm">
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="periyodik" data-key="baslik" onclick="tabloSirala('periyodik','baslik',renderPeriyodik)">Başlık <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="periyodik" data-key="site_adi" onclick="tabloSirala('periyodik','site_adi',renderPeriyodik)">Tesis <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="periyodik" data-key="personel_adi" onclick="tabloSirala('periyodik','personel_adi',renderPeriyodik)">Personel <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium">Tekrar</th>
+                            <th class="px-6 py-4 font-medium">Son Üretim</th>
+                            <th class="px-6 py-4 font-medium sortable" data-tablo="periyodik" data-key="aktif" onclick="tabloSirala('periyodik','aktif',renderPeriyodik)">Durum <i class="sort-ico fa-solid fa-arrows-up-down"></i></th>
+                            <th class="px-6 py-4 font-medium text-right">İşlem</th>
+                        </tr></thead>
+                        <tbody id="periyodik-tbody" class="text-sm divide-y divide-slate-100"></tbody>
+                    </table></div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- ============ MODALLAR ============ -->
+    <!-- Yeni İş Emri -->
+    <div id="isEmriModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 id="isEmriModalBaslik" class="text-lg font-bold text-slate-800">Yeni İş Emri</h3><button onclick="closeModal('isEmriModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <form id="isEmriForm" class="p-5 space-y-4">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Görev Başlığı *</label><input name="baslik" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Örn: A Blok Merdiven Temizliği"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tesis / Site *</label><select name="site_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Personel *</label><select name="personel_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                </div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Açıklama</label><textarea name="aciklama" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="İsteğe bağlı detay"></textarea></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Planlanan Başlangıç</label><input name="planlanan_baslangic_tarihi" type="datetime-local" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">QR Kod (opsiyonel)</label><input name="qr_kod" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tesisteki QR değeri"></div>
+                </div>
+                <p class="text-xs text-slate-400">QR girilirse personel sahadaki bu kodu okutarak görevi başlatır. Boşsa konumla başlatılır.</p>
+                <div class="modal-error text-sm text-red-500 hidden"></div>
+                <div class="flex justify-end gap-3 pt-2"><button type="button" onclick="closeModal('isEmriModal')" class="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">İptal</button><button id="isEmriSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Oluştur ve Ata</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Personel Ekle -->
+    <div id="personelModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 id="personelModalBaslik" class="text-lg font-bold text-slate-800">Personel Ekle</h3><button onclick="closeModal('personelModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <form id="personelForm" class="p-5 space-y-4">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Ad Soyad *</label><input name="ad_soyad" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Telefon *</label><input name="telefon" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="05xx..."></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Rol *</label><select name="rol" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"><option value="temizlik">Temizlik</option><option value="teknik">Teknik</option><option value="yonetici">Yönetici</option></select></div>
+                </div>
+                <div><label id="personelSifreLabel" class="block text-sm font-medium text-slate-600 mb-1">Şifre *</label><input id="personelSifreInput" name="sifre" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Personelin mobil giriş şifresi"></div>
+                <div class="modal-error text-sm text-red-500 hidden"></div>
+                <div class="flex justify-end gap-3 pt-2"><button type="button" onclick="closeModal('personelModal')" class="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">İptal</button><button id="personelSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Ekle</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Site Ekle -->
+    <div id="siteModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 id="siteModalBaslik" class="text-lg font-bold text-slate-800">Site / Tesis Ekle</h3><button onclick="closeModal('siteModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <form id="siteForm" class="p-5 space-y-4">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Tesis Adı *</label><input name="ad" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Örn: Güneş Sitesi"></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Adres</label><textarea name="adres" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Enlem (Latitude)</label><input name="enlem" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="41.0082"></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Boylam (Longitude)</label><input name="boylam" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="28.9784"></div>
+                </div>
+                <p class="text-xs text-slate-400">Konum opsiyoneldir; girilirse mobil uygulamada "50 metre" kuralı bu tesiste uygulanır.</p>
+                <div class="modal-error text-sm text-red-500 hidden"></div>
+                <div class="flex justify-end gap-3 pt-2"><button type="button" onclick="closeModal('siteModal')" class="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">İptal</button><button id="siteSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Ekle</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tesis QR Kodu -->
+    <div id="qrModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 class="text-lg font-bold text-slate-800">Tesis QR Kodu</h3><button onclick="closeModal('qrModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <div class="p-6 text-center">
+                <p id="qrSiteAdi" class="text-base font-semibold text-slate-800 mb-1">-</p>
+                <p class="text-xs text-slate-400 mb-4">Bu kodu tesise asın. Personel okutarak görevi başlatır.</p>
+                <div id="qrBox" class="flex justify-center p-4 bg-white border border-slate-200 rounded-xl mb-3 mx-auto" style="width:fit-content"></div>
+                <p id="qrKodMetin" class="font-mono text-sm text-slate-500 mb-5">-</p>
+                <div class="flex gap-3">
+                    <button onclick="qrYazdir()" class="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-print"></i> Yazdır</button>
+                    <button onclick="qrYenile()" class="flex-1 px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-rotate"></i> Yeni QR Üret</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yeni Arıza (Yönetici) -->
+    <div id="arizaEkleModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 id="arizaEkleModalBaslik" class="text-lg font-bold text-slate-800">Yeni Arıza</h3><button onclick="closeModal('arizaEkleModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <form id="arizaEkleForm" class="p-5 space-y-4">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Arıza Başlığı *</label><input name="baslik" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Örn: B Blok asansör arızası"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tesis *</label><select name="site_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Teknik Personel</label><select name="teknik_personel_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                </div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Açıklama</label><textarea name="aciklama" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="İsteğe bağlı detay"></textarea></div>
+                <p class="text-xs text-slate-400">Teknik personel seçilirse arıza ona atanır ve bildirim gönderilir.</p>
+                <div class="modal-error text-sm text-red-500 hidden"></div>
+                <div class="flex justify-end gap-3 pt-2"><button type="button" onclick="closeModal('arizaEkleModal')" class="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">İptal</button><button id="arizaEkleSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Oluştur</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Yeni Periyodik Görev Şablonu -->
+    <div id="periyodikModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100"><h3 id="periyodikModalBaslik" class="text-lg font-bold text-slate-800">Yeni Periyodik Görev</h3><button onclick="closeModal('periyodikModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+            <form id="periyodikForm" class="p-5 space-y-4">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Görev Başlığı *</label><input name="baslik" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Örn: Ortak Alan Günlük Temizliği"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tesis / Site *</label><select name="site_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Personel *</label><select name="personel_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tekrar *</label>
+                        <select name="tekrar_tipi" required onchange="periyodikTekrarDegisti()" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="gunluk">Her gün</option><option value="haftalik">Haftalık</option><option value="aylik">Aylık</option>
+                        </select>
+                    </div>
+                    <div id="periyodik-haftalik-wrap" class="hidden"><label class="block text-sm font-medium text-slate-600 mb-1">Haftanın Günü</label>
+                        <select name="tekrar_gunu_hafta" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="1">Pazartesi</option><option value="2">Salı</option><option value="3">Çarşamba</option><option value="4">Perşembe</option><option value="5">Cuma</option><option value="6">Cumartesi</option><option value="7">Pazar</option>
+                        </select>
+                    </div>
+                    <div id="periyodik-aylik-wrap" class="hidden"><label class="block text-sm font-medium text-slate-600 mb-1">Ayın Günü (1-31)</label>
+                        <input name="tekrar_gunu_ay" type="number" min="1" max="31" value="1" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Açıklama</label><textarea name="aciklama" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="İsteğe bağlı detay"></textarea></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Checklist (her satır bir madde)</label><textarea name="alt_gorevler" rows="3" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Çöp kovaları boşaltıldı&#10;Zemin paspaslandı&#10;Asansör aynası silindi"></textarea></div>
+                <p class="text-xs text-slate-400">Şablon her gece kontrol edilir; tekrar kuralı bugüne denk gelirse seçili personele otomatik iş emri ve checklist atanır.</p>
+                <div class="modal-error text-sm text-red-500 hidden"></div>
+                <div class="flex justify-end gap-3 pt-2"><button type="button" onclick="closeModal('periyodikModal')" class="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">İptal</button><button id="periyodikSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Şablon Oluştur</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- İş Emri Detay -->
+    <div id="detayModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100">
+                <h3 class="text-lg font-bold text-slate-800">İş Emri Detayı</h3>
+                <button onclick="closeModal('detayModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div id="detayIcerik" class="p-5 overflow-y-auto">
+                <div class="text-center text-slate-400 py-10">Yükleniyor...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arıza Detay / Yönetim -->
+    <div id="arizaModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-100">
+                <h3 class="text-lg font-bold text-slate-800">Arıza Detayı</h3>
+                <button onclick="closeModal('arizaModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div id="arizaIcerik" class="p-5 overflow-y-auto">
+                <div class="text-center text-slate-400 py-10">Yükleniyor...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast bildirim alanı -->
+    <div id="toastWrap"></div>
+
+    <!-- Onay modalı (native confirm yerine) -->
+    <div id="onayModal" class="modal fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div id="onayIkon" class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center text-2xl"></div>
+            <h3 id="onayBaslik" class="text-lg font-bold text-slate-800 mb-1"></h3>
+            <p id="onayMesaj" class="text-sm text-slate-500 mb-6"></p>
+            <div class="flex gap-3">
+                <button id="onayIptal" class="flex-1 px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">İptal</button>
+                <button id="onayTamam" class="flex-1 px-4 py-2.5 rounded-lg text-white font-medium"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '../backend/api';
+        const BACKEND = '../backend';
+        const token = localStorage.getItem('glow_token');
+        if (!token) { window.location.href = 'index.html'; }
+
+        async function apiFetch(path, options = {}) {
+            const res = await fetch(`${API}/${path}`, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(options.headers || {}) },
+            });
+            if (res.status === 401 || res.status === 403) { localStorage.clear(); window.location.href = 'index.html'; throw new Error('Yetkisiz'); }
+            return res;
+        }
+
+        // ============ TEMA (açık / koyu) ============
+        function _temaIkonGuncelle() {
+            const dark = document.documentElement.classList.contains('dark');
+            const i = document.querySelector('#themeToggle i');
+            if (i) i.className = `fa-solid ${dark ? 'fa-sun' : 'fa-moon'} text-lg`;
+        }
+        function toggleTheme() {
+            const dark = document.documentElement.classList.toggle('dark');
+            try { localStorage.setItem('glow_theme', dark ? 'dark' : 'light'); } catch (_) {}
+            _temaIkonGuncelle();
+        }
+
+        // ============ TOAST ============
+        const TOAST_STIL = {
+            success: ['fa-circle-check', 'text-emerald-500', 'border-emerald-500'],
+            error:   ['fa-circle-exclamation', 'text-red-500', 'border-red-500'],
+            info:    ['fa-circle-info', 'text-blue-500', 'border-blue-500'],
+            warn:    ['fa-triangle-exclamation', 'text-amber-500', 'border-amber-500'],
+        };
+        function toast(mesaj, tip = 'info', sure = 3200) {
+            const [ikon, renk, kenar] = TOAST_STIL[tip] || TOAST_STIL.info;
+            const el = document.createElement('div');
+            el.className = `toast bg-white border-l-4 ${kenar} shadow-2xl rounded-xl px-4 py-3 flex items-start gap-3`;
+            el.innerHTML = `<i class="fa-solid ${ikon} ${renk} text-lg mt-0.5"></i>
+                <p class="text-sm font-medium text-slate-700 flex-1">${esc(mesaj)}</p>
+                <button class="text-slate-300 hover:text-slate-500" aria-label="Kapat"><i class="fa-solid fa-xmark"></i></button>`;
+            const kapat = () => { el.classList.add('hide'); setTimeout(() => el.remove(), 200); };
+            el.querySelector('button').onclick = kapat;
+            document.getElementById('toastWrap').appendChild(el);
+            if (sure) setTimeout(kapat, sure);
+        }
+
+        // ============ ONAY MODALI (native confirm yerine) ============
+        function onayla(baslik, mesaj, onayMetni = 'Onayla', tip = 'normal') {
+            return new Promise(resolve => {
+                const m = document.getElementById('onayModal');
+                document.getElementById('onayBaslik').innerText = baslik;
+                document.getElementById('onayMesaj').innerText = mesaj;
+                const ikon = document.getElementById('onayIkon');
+                const tamam = document.getElementById('onayTamam');
+                const iptal = document.getElementById('onayIptal');
+                const tehlike = tip === 'tehlike';
+                ikon.className = `w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center text-2xl ${tehlike ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`;
+                ikon.innerHTML = `<i class="fa-solid ${tehlike ? 'fa-triangle-exclamation' : 'fa-circle-question'}"></i>`;
+                tamam.innerText = onayMetni;
+                tamam.className = `flex-1 px-4 py-2.5 rounded-lg text-white font-medium shadow-sm ${tehlike ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+                m.classList.remove('hidden'); m.classList.add('flex');
+                const kapat = (sonuc) => { m.classList.add('hidden'); m.classList.remove('flex'); tamam.onclick = null; iptal.onclick = null; resolve(sonuc); };
+                tamam.onclick = () => kapat(true);
+                iptal.onclick = () => kapat(false);
+            });
+        }
+
+        // ============ İSKELET (skeleton) ve BOŞ DURUM ============
+        function skeletonSatir(kolon, adet = 5) {
+            const hucre = (g) => `<td class="px-6 py-4"><span class="skel" style="width:${g}"></span></td>`;
+            const genislikler = ['70%','55%','45%','60%','40%','50%','35%'];
+            let html = '';
+            for (let i = 0; i < adet; i++) {
+                let satir = '';
+                for (let k = 0; k < kolon; k++) satir += hucre(genislikler[k % genislikler.length]);
+                html += `<tr>${satir}</tr>`;
+            }
+            return html;
+        }
+        function bosDurum(kolon, ikon, baslik, aciklama = '', butonHtml = '') {
+            return `<tr><td colspan="${kolon}" class="px-6 py-14 text-center">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mb-1"><i class="fa-solid ${ikon}"></i></div>
+                    <p class="text-slate-700 font-semibold">${esc(baslik)}</p>
+                    ${aciklama ? `<p class="text-sm text-slate-400 max-w-xs">${esc(aciklama)}</p>` : ''}
+                    ${butonHtml ? `<div class="mt-2">${butonHtml}</div>` : ''}
+                </div>
+            </td></tr>`;
+        }
+
+        // ============ ARAMA + SIRALAMA (istemci taraflı tablo motoru) ============
+        // Her tablo için arama metni ve sıralama durumu burada tutulur.
+        const _tabloDurum = {}; // { anahtar: { q:'', sortKey:null, sortDir:1 } }
+        function _durum(anahtar) { return _tabloDurum[anahtar] || (_tabloDurum[anahtar] = { q: '', sortKey: null, sortDir: 1 }); }
+
+        // Listeyi arama metni + sıralama durumuna göre süzer/sıralar.
+        function tabloUygula(anahtar, liste, aramaAlanlari) {
+            const d = _durum(anahtar);
+            let sonuc = liste;
+            if (d.q) {
+                const q = d.q.toLocaleLowerCase('tr');
+                sonuc = sonuc.filter(o => aramaAlanlari.some(a => String(o[a] ?? '').toLocaleLowerCase('tr').includes(q)));
+            }
+            if (d.sortKey) {
+                const k = d.sortKey, yon = d.sortDir;
+                sonuc = [...sonuc].sort((a, b) => {
+                    let x = a[k] ?? '', y = b[k] ?? '';
+                    const nx = parseFloat(x), ny = parseFloat(y);
+                    if (!isNaN(nx) && !isNaN(ny) && String(x).trim() !== '' && String(y).trim() !== '') { x = nx; y = ny; }
+                    else { x = String(x).toLocaleLowerCase('tr'); y = String(y).toLocaleLowerCase('tr'); }
+                    return x < y ? -yon : x > y ? yon : 0;
+                });
+            }
+            return sonuc;
+        }
+        // Sütun başlığına tıklanınca sıralama yönünü değiştirir ve yeniden yükler.
+        function tabloSirala(anahtar, key, yenidenYukle) {
+            const d = _durum(anahtar);
+            if (d.sortKey === key) d.sortDir *= -1; else { d.sortKey = key; d.sortDir = 1; }
+            yenidenYukle();
+            // başlık oklarını güncelle
+            document.querySelectorAll(`th[data-tablo="${anahtar}"]`).forEach(th => {
+                th.classList.remove('asc', 'desc');
+                const ico = th.querySelector('.sort-ico');
+                if (th.dataset.key === key) { th.classList.add(d.sortDir === 1 ? 'asc' : 'desc'); if (ico) ico.className = `sort-ico fa-solid ${d.sortDir === 1 ? 'fa-arrow-up-long' : 'fa-arrow-down-long'}`; }
+                else if (ico) ico.className = 'sort-ico fa-solid fa-arrows-up-down';
+            });
+        }
+        // Arama kutusu girişi.
+        function tabloAra(anahtar, deger, yenidenYukle) { _durum(anahtar).q = deger.trim(); yenidenYukle(); }
+
+        // Bir görünümün başlığı için arama kutusu üretir.
+        function aramaKutusu(anahtar, yukleyici, placeholder = 'Ara...') {
+            return `<div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="search" value="${esc(_durum(anahtar).q)}" oninput="tabloAra('${anahtar}', this.value, ${yukleyici})" placeholder="${placeholder}"
+                    class="pl-9 pr-3 py-2.5 w-56 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+            </div>`;
+        }
+
+        // ---- Yardımcılar ----
+        const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        const bashar = (ad) => !ad ? '' : ad.trim().split(/\s+/).map(p => p[0]).slice(0,2).join('').toUpperCase();
+        function formatTarih(t) { if (!t) return '-'; const d = new Date(t.replace(' ','T')); return isNaN(d) ? t : d.toLocaleString('tr-TR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+
+        const DURUM = {
+            tamamlandi:['bg-emerald-50 text-emerald-600','bg-emerald-500','Tamamlandı'], devam_ediyor:['bg-amber-50 text-amber-600','bg-amber-500','Devam Ediyor'],
+            bekliyor:['bg-slate-100 text-slate-600','bg-slate-400','Bekliyor'], iptal:['bg-red-50 text-red-600','bg-red-500','İptal'],
+            acik:['bg-red-50 text-red-600','bg-red-500','Açık'], cozuldu:['bg-emerald-50 text-emerald-600','bg-emerald-500','Çözüldü'],
+            onaylandi:['bg-emerald-50 text-emerald-600','bg-emerald-500','Onaylandı'], reddedildi:['bg-red-50 text-red-600','bg-red-500','Reddedildi'],
+            dis_destek:['bg-purple-50 text-purple-600','bg-purple-500','Dış Destek Gerekli'],
+        };
+        function durumBadge(d) { const [c,dot,l] = DURUM[d] || DURUM.bekliyor; return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${c}"><span class="w-1.5 h-1.5 rounded-full ${dot}"></span> ${l}</span>`; }
+        function personelHucre(ad) { return ad ? `<div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">${esc(bashar(ad))}</div><span class="text-slate-600">${esc(ad)}</span></div>` : '<span class="text-slate-400 italic">Atanmadı</span>'; }
+
+        const ROL = { yonetici:['bg-amber-50 text-amber-700','Yönetici'], teknik:['bg-violet-50 text-violet-700','Teknik'], temizlik:['bg-blue-50 text-blue-700','Temizlik'] };
+        function rolBadge(rol) { const [c,l] = ROL[rol] || ['bg-slate-100 text-slate-600', rol || '-']; return `<span class="px-2.5 py-1 rounded-md text-xs font-medium ${c}">${esc(l)}</span>`; }
+        function aktifBadge(aktif) { return aktif == 1 ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aktif</span>' : '<span class="inline-flex items-center gap-1.5 text-slate-400 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Pasif</span>'; }
+
+        // ---- Görünüm geçişi ----
+        const BASLIKLAR = { dashboard:'Dashboard', personeller:'Personeller', siteler:'Siteler / Tesisler', isemirleri:'İş Emirleri', arizalar:'Arıza Kayıtları', masraflar:'Masraflar', periyodik:'Periyodik Görevler' };
+        const YUKLEYICI = { dashboard:loadDashboard, personeller:loadPersoneller, siteler:loadSiteler, isemirleri:loadIsEmirleri, arizalar:loadArizalar, masraflar:loadMasraflar, periyodik:loadPeriyodik };
+        function switchView(name) {
+            document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('view-' + name).classList.remove('hidden');
+            document.getElementById('page-title').innerText = BASLIKLAR[name];
+            document.querySelectorAll('.nav-link').forEach(a => { a.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group text-slate-400 hover:text-white hover:bg-slate-800'; });
+            const aktif = document.getElementById('nav-' + (name === 'isemirleri' ? 'isemirleri' : name));
+            aktif.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group bg-blue-500/10 text-blue-400 border border-blue-500/20';
+            toggleSidebar(false); // mobilde seçince menüyü kapat
+            (YUKLEYICI[name] || (()=>{}))();
+        }
+
+        // ---- Mobil sidebar ----
+        function toggleSidebar(ac) {
+            const sb = document.getElementById('sidebar');
+            const bd = document.getElementById('sidebarBackdrop');
+            if (ac) { sb.classList.remove('-translate-x-full'); bd.classList.remove('hidden'); }
+            else { sb.classList.add('-translate-x-full'); bd.classList.add('hidden'); }
+        }
+
+        // ---- Modallar ----
+        function openModal(id) { const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex'); m.querySelector('.modal-error')?.classList.add('hidden'); }
+        function closeModal(id) { const m = document.getElementById(id); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+        // ---- DASHBOARD ----
+        let _dashSiteFilterDoldu = false;
+        async function loadDashboard() {
+            try {
+                document.getElementById('tesisler-ozet').innerHTML = '<div class="skel" style="width:100%;height:108px;border-radius:1rem"></div>'.repeat(3);
+                document.getElementById('son-isler-tbody').innerHTML = skeletonSatir(5);
+                const siteId = document.getElementById('dashboard-site-filter').value;
+                let path = 'admin/dashboard.php';
+                if (siteId) path += '?site_id=' + encodeURIComponent(siteId);
+                const data = await (await apiFetch(path)).json();
+                const s = data.istatistik;
+                document.getElementById('stat-tamamlanan').innerText = s.tamamlanan_is;
+                document.getElementById('stat-devam').innerText = s.devam_eden_is;
+                document.getElementById('stat-ariza').innerText = s.acik_ariza;
+                document.getElementById('stat-personel').innerText = s.aktif_personel;
+
+                const sites = data.site_ozet || [];
+
+                // Tesis filtresini bir kez doldur
+                if (!_dashSiteFilterDoldu) {
+                    const filterSel = document.getElementById('dashboard-site-filter');
+                    sites.forEach(st => {
+                        const o = document.createElement('option');
+                        o.value = st.id; o.textContent = st.ad;
+                        filterSel.appendChild(o);
+                    });
+                    _dashSiteFilterDoldu = true;
+                }
+
+                // Tesisler özeti kartları
+                const ozetBox = document.getElementById('tesisler-ozet');
+                ozetBox.innerHTML = sites.length ? sites.map(st => {
+                    const aktif = String(st.id) === String(siteId);
+                    return `<button onclick="dashboardSiteSec('${st.id}')" class="text-left bg-white p-5 rounded-2xl border ${aktif ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100/50'} shadow-sm hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-slate-800 truncate">${esc(st.ad)}</h3>
+                            <i class="fa-solid fa-building ${aktif ? 'text-blue-500' : 'text-slate-300'}"></i>
+                        </div>
+                        <div class="flex gap-5 text-sm">
+                            <div><span class="text-amber-600 font-bold text-lg">${st.devam_eden}</span><p class="text-slate-400 text-xs">Devam eden</p></div>
+                            <div><span class="text-red-500 font-bold text-lg">${st.acik_ariza}</span><p class="text-slate-400 text-xs">Açık arıza</p></div>
+                            <div><span class="text-emerald-600 font-bold text-lg">${st.bu_ay_tamamlanan}</span><p class="text-slate-400 text-xs">Bu ay biten</p></div>
+                        </div>
+                    </button>`;
+                }).join('') : `<div class="text-slate-400 text-sm">Henüz tesis eklenmemiş.</div>`;
+
+                // Son iş emirleri
+                const tbody = document.getElementById('son-isler-tbody');
+                const isler = data.son_is_emirleri || [];
+                tbody.innerHTML = isler.length ? isler.map(r => `
+                    <tr class="hover:bg-slate-50/50 cursor-pointer" onclick="openIsEmriDetay(${r.id})">
+                        <td class="px-6 py-4 text-slate-800 font-medium">${esc(r.baslik)}</td>
+                        <td class="px-6 py-4 text-slate-600">${esc(r.site_adi||'-')}</td>
+                        <td class="px-6 py-4">${personelHucre(r.personel_adi)}</td>
+                        <td class="px-6 py-4">${durumBadge(r.durum)}</td>
+                        <td class="px-6 py-4 text-slate-500">${formatTarih(r.olusturma_tarihi)}</td>
+                    </tr>`).join('') : `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">Bu seçim için iş emri yok.</td></tr>`;
+            } catch (e) { console.error(e); }
+        }
+
+        function dashboardSiteSec(id) {
+            const sel = document.getElementById('dashboard-site-filter');
+            sel.value = (sel.value === String(id)) ? '' : String(id); // tekrar tıklayınca filtreyi kaldır
+            loadDashboard();
+        }
+
+        // Seçili tesisi raporla aç (tesis bazlı rapor)
+        function acAylikRapor() {
+            const siteId = document.getElementById('dashboard-site-filter').value;
+            const url = siteId ? `rapor_pdf.html?site_id=${encodeURIComponent(siteId)}` : 'rapor_pdf.html';
+            window.open(url, '_blank');
+        }
+
+        // ---- PERSONELLER ----
+        let _personelListe = [];
+        async function loadPersoneller() {
+            const tbody = document.getElementById('personeller-tbody');
+            document.getElementById('arama-personeller').innerHTML = aramaKutusu('personeller', 'renderPersoneller', 'Ad veya telefon ara...');
+            tbody.innerHTML = skeletonSatir(5);
+            try {
+                _personelListe = (await (await apiFetch('admin/personeller.php')).json()).data || [];
+                renderPersoneller();
+            } catch (e) { tbody.innerHTML = bosDurum(5, 'fa-triangle-exclamation', 'Yüklenemedi', 'Personel listesi alınamadı.'); console.error(e); }
+        }
+        function renderPersoneller() {
+            const tbody = document.getElementById('personeller-tbody');
+            const liste = tabloUygula('personeller', _personelListe, ['ad_soyad', 'telefon', 'rol']);
+            if (!liste.length) {
+                tbody.innerHTML = _personelListe.length
+                    ? bosDurum(5, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Aramanıza uygun personel yok.')
+                    : bosDurum(5, 'fa-users', 'Henüz personel yok', 'İlk personelinizi ekleyerek başlayın.', `<button onclick="openPersonelModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"><i class="fa-solid fa-user-plus mr-1"></i> Personel Ekle</button>`);
+                return;
+            }
+            tbody.innerHTML = liste.map(p => {
+                const aktif = p.aktif == 1;
+                return `
+                <tr class="hover:bg-slate-50/50">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(p.ad_soyad)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(p.telefon)}</td>
+                    <td class="px-6 py-4">${rolBadge(p.rol)}</td>
+                    <td class="px-6 py-4">${aktifBadge(p.aktif)}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="personelDuzenle(${p.id})" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button>
+                        <button onclick="personelIslem(${p.id},'aktif_degistir')" class="px-3 py-1.5 rounded-lg ${aktif ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'} text-white text-xs font-medium mr-1">${aktif ? 'Pasif Yap' : 'Aktif Yap'}</button>
+                        <button onclick="personelIslem(${p.id},'sil')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium"><i class="fa-solid fa-trash"></i> Sil</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ---- Personel ekle/düzenle ----
+        let _personelEditId = null;
+        function openPersonelModal(p = null) {
+            _personelEditId = p ? p.id : null;
+            const form = document.getElementById('personelForm');
+            form.reset();
+            document.getElementById('personelModalBaslik').innerText = p ? 'Personeli Düzenle' : 'Personel Ekle';
+            document.getElementById('personelSubmitBtn').innerText = p ? 'Değişiklikleri Kaydet' : 'Ekle';
+            const sifre = document.getElementById('personelSifreInput');
+            const sifreLabel = document.getElementById('personelSifreLabel');
+            if (p) {
+                form.ad_soyad.value = p.ad_soyad || '';
+                form.telefon.value = p.telefon || '';
+                form.rol.value = p.rol || 'temizlik';
+                // Düzenlemede şifre opsiyonel: boş bırakılırsa değişmez
+                sifre.required = false;
+                sifreLabel.innerText = 'Yeni Şifre (opsiyonel)';
+                sifre.placeholder = 'Boş bırakırsan şifre değişmez';
+            } else {
+                sifre.required = true;
+                sifreLabel.innerText = 'Şifre *';
+                sifre.placeholder = 'Personelin mobil giriş şifresi';
+            }
+            openModal('personelModal');
+        }
+
+        function personelDuzenle(id) {
+            const p = _personelListe.find(x => String(x.id) === String(id));
+            if (p) openPersonelModal(p);
+        }
+
+        async function personelIslem(id, islem) {
+            if (islem === 'sil' && !await onayla('Personeli sil', 'Bu personel silinsin mi? Bağlı iş emri/arıza/masraf varsa silinemez; bunun yerine "Pasif Yap" kullanın.', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/personeller.php', { method: 'POST', body: JSON.stringify({ id, islem }) });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) { loadPersoneller(); toast(islem === 'sil' ? 'Personel silindi.' : 'Personel durumu güncellendi.', 'success'); }
+                else toast(data.message || 'İşlem başarısız.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        // ---- SİTELER ----
+        let _siteListe = [];
+        async function loadSiteler() {
+            const tbody = document.getElementById('siteler-tbody');
+            document.getElementById('arama-siteler').innerHTML = aramaKutusu('siteler', 'renderSiteler', 'Tesis adı veya adres...');
+            tbody.innerHTML = skeletonSatir(4);
+            try {
+                _siteListe = (await (await apiFetch('admin/siteler.php')).json()).data || [];
+                renderSiteler();
+            } catch (e) { tbody.innerHTML = bosDurum(4, 'fa-triangle-exclamation', 'Yüklenemedi', 'Tesis listesi alınamadı.'); console.error(e); }
+        }
+        function renderSiteler() {
+            const tbody = document.getElementById('siteler-tbody');
+            const liste = tabloUygula('siteler', _siteListe, ['ad', 'adres']);
+            if (!liste.length) {
+                tbody.innerHTML = _siteListe.length
+                    ? bosDurum(4, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Aramanıza uygun tesis yok.')
+                    : bosDurum(4, 'fa-building', 'Henüz tesis yok', 'İlk tesisinizi ekleyin; personel görevlerini buralara atayacaksınız.', `<button onclick="openSiteModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"><i class="fa-solid fa-plus mr-1"></i> Site Ekle</button>`);
+                return;
+            }
+            tbody.innerHTML = liste.map(s => `
+                <tr class="hover:bg-slate-50/50">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(s.ad)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(s.adres || '-')}</td>
+                    <td class="px-6 py-4 text-slate-500">${s.enlem && s.boylam ? `${s.enlem}, ${s.boylam}` : '<span class="text-slate-400 italic">Konum yok</span>'}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="siteQrGoster(${s.id})" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium mr-1"><i class="fa-solid fa-qrcode"></i> QR</button>
+                        <button onclick="siteDuzenle(${s.id})" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button>
+                        <button onclick="siteSil(${s.id})" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium"><i class="fa-solid fa-trash"></i> Sil</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        // ---- Site ekle/düzenle ----
+        let _siteEditId = null;
+        function openSiteModal(s = null) {
+            _siteEditId = s ? s.id : null;
+            const form = document.getElementById('siteForm');
+            form.reset();
+            document.getElementById('siteModalBaslik').innerText = s ? 'Tesisi Düzenle' : 'Site / Tesis Ekle';
+            document.getElementById('siteSubmitBtn').innerText = s ? 'Değişiklikleri Kaydet' : 'Ekle';
+            if (s) {
+                form.ad.value = s.ad || '';
+                form.adres.value = s.adres || '';
+                form.enlem.value = s.enlem || '';
+                form.boylam.value = s.boylam || '';
+            }
+            openModal('siteModal');
+        }
+
+        function siteDuzenle(id) {
+            const s = _siteListe.find(x => String(x.id) === String(id));
+            if (s) openSiteModal(s);
+        }
+
+        async function siteSil(id) {
+            if (!await onayla('Tesisi sil', 'Bu tesis silinsin mi? Bağlı iş emri/arıza varsa silinemez.', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/siteler.php', { method: 'POST', body: JSON.stringify({ id, islem: 'sil' }) });
+                const d = await res.json().catch(() => ({}));
+                if (res.ok) { loadSiteler(); toast('Tesis silindi.', 'success'); }
+                else toast(d.message || 'Silinemedi.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        // ---- Tesis QR ----
+        let _qrAktifSite = null;
+        function _qrCiz(kod) {
+            const box = document.getElementById('qrBox');
+            box.innerHTML = '';
+            new QRCode(box, { text: kod, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+            document.getElementById('qrKodMetin').innerText = kod;
+        }
+        function siteQrGoster(id) {
+            const s = _siteListe.find(x => String(x.id) === String(id));
+            if (!s) return;
+            _qrAktifSite = s;
+            document.getElementById('qrSiteAdi').innerText = s.ad;
+            _qrCiz(s.qr_kod);
+            openModal('qrModal');
+        }
+        async function qrYenile() {
+            if (!_qrAktifSite) return;
+            if (!await onayla('Yeni QR üret', 'Yeni QR üretilirse eski basılı QR geçersiz olur. Devam edilsin mi?', 'Yeni QR Üret', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/siteler.php', { method: 'POST', body: JSON.stringify({ id: _qrAktifSite.id, islem: 'qr_yenile' }) });
+                const d = await res.json();
+                if (res.ok) { _qrAktifSite.qr_kod = d.qr_kod; _qrCiz(d.qr_kod); loadSiteler(); toast('Yeni QR üretildi.', 'success'); }
+                else toast(d.message || 'QR üretilemedi.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+        function qrYazdir() {
+            if (!_qrAktifSite) return;
+            const img = document.querySelector('#qrBox img') || document.querySelector('#qrBox canvas');
+            const src = img.tagName === 'IMG' ? img.src : img.toDataURL();
+            const w = window.open('', '_blank', 'width=420,height=560');
+            w.document.write(`<html><head><title>QR - ${esc(_qrAktifSite.ad)}</title></head>
+                <body style="font-family:Inter,Arial,sans-serif;text-align:center;padding:40px">
+                <h2 style="margin:0 0 6px">${esc(_qrAktifSite.ad)}</h2>
+                <p style="color:#64748b;margin:0 0 20px">Görevi başlatmak için bu QR'ı okutun</p>
+                <img src="${src}" style="width:300px;height:300px"/>
+                <p style="font-family:monospace;color:#475569;margin-top:16px">${esc(_qrAktifSite.qr_kod)}</p>
+                </body></html>`);
+            w.document.close();
+            w.focus();
+            setTimeout(() => { w.print(); }, 300);
+        }
+
+        // ---- İŞ EMİRLERİ ----
+        let _isEmriListe = [];
+        async function loadIsEmirleri() {
+            const tbody = document.getElementById('isemirleri-tbody');
+            const filtre = document.getElementById('isemri-filtre').value;
+            document.getElementById('arama-isemirleri').innerHTML = aramaKutusu('isemirleri', 'renderIsEmirleri', 'Başlık, tesis, personel...');
+            tbody.innerHTML = skeletonSatir(6);
+            try {
+                let path = 'admin/is_emirleri.php';
+                if (filtre) path += `?durum=${encodeURIComponent(filtre)}`;
+                _isEmriListe = (await (await apiFetch(path)).json()).data || [];
+                renderIsEmirleri();
+            } catch (e) { tbody.innerHTML = bosDurum(6, 'fa-triangle-exclamation', 'Yüklenemedi', 'İş emirleri alınamadı.'); console.error(e); }
+        }
+        function renderIsEmirleri() {
+            const tbody = document.getElementById('isemirleri-tbody');
+            const liste = tabloUygula('isemirleri', _isEmriListe, ['baslik', 'site_adi', 'personel_adi']);
+            if (!liste.length) {
+                tbody.innerHTML = _isEmriListe.length
+                    ? bosDurum(6, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Arama/filtreye uygun iş emri yok.')
+                    : bosDurum(6, 'fa-clipboard-list', 'İş emri yok', 'Seçili duruma uygun iş emri bulunmuyor.', `<button onclick="openIsEmriModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"><i class="fa-solid fa-plus mr-1"></i> Yeni İş Emri</button>`);
+                return;
+            }
+            tbody.innerHTML = liste.map(r => `
+                <tr class="hover:bg-slate-50/50 cursor-pointer" onclick="openIsEmriDetay(${r.id})">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(r.baslik)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(r.site_adi||'-')}</td>
+                    <td class="px-6 py-4">${personelHucre(r.personel_adi)}</td>
+                    <td class="px-6 py-4">${durumBadge(r.durum)}</td>
+                    <td class="px-6 py-4 text-slate-500">${formatTarih(r.olusturma_tarihi)}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="event.stopPropagation(); isEmriDuzenle(${r.id})" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button>
+                        <button onclick="event.stopPropagation(); isEmriSil(${r.id})" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium"><i class="fa-solid fa-trash"></i> Sil</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        async function isEmriSil(id) {
+            if (!await onayla('İş emrini sil', 'Bu iş emri silinsin mi? Bağlı checklist ve masraf kayıtları da silinir. Bu işlem geri alınamaz.', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/is_emirleri.php', { method: 'POST', body: JSON.stringify({ id, islem: 'sil' }) });
+                const d = await res.json().catch(() => ({}));
+                if (res.ok) { loadIsEmirleri(); loadDashboard(); toast('İş emri silindi.', 'success'); }
+                else toast(d.message || 'Silinemedi.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        function isEmriDuzenle(id) {
+            const r = _isEmriListe.find(x => String(x.id) === String(id));
+            if (r) openIsEmriModal(r);
+        }
+
+        // ---- ARIZALAR ----
+        let _arizaCache = [];
+        async function loadArizalar() {
+            const tbody = document.getElementById('arizalar-tbody');
+            document.getElementById('arama-arizalar').innerHTML = aramaKutusu('arizalar', 'renderArizalar', 'Başlık, tesis, personel...');
+            tbody.innerHTML = skeletonSatir(6);
+            try {
+                _arizaCache = (await (await apiFetch('admin/arizalar.php')).json()).data || [];
+                renderArizalar();
+            } catch (e) { tbody.innerHTML = bosDurum(6, 'fa-triangle-exclamation', 'Yüklenemedi', 'Arıza kayıtları alınamadı.'); console.error(e); }
+        }
+        function renderArizalar() {
+            const tbody = document.getElementById('arizalar-tbody');
+            const liste = tabloUygula('arizalar', _arizaCache, ['baslik', 'site_adi', 'bildiren_adi', 'teknik_adi']);
+            if (!liste.length) {
+                tbody.innerHTML = _arizaCache.length
+                    ? bosDurum(6, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Aramanıza uygun arıza yok.')
+                    : bosDurum(6, 'fa-wrench', 'Arıza kaydı yok', 'Sahadan bildirim geldikçe arızalar burada listelenir.');
+                return;
+            }
+            tbody.innerHTML = liste.map(a => `
+                <tr class="hover:bg-slate-50/50 cursor-pointer" onclick="openArizaDetay(${a.id})">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(a.baslik)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(a.site_adi||'-')}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(a.bildiren_adi||'-')}</td>
+                    <td class="px-6 py-4">${personelHucre(a.teknik_adi)}</td>
+                    <td class="px-6 py-4">${durumBadge(a.durum)}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="event.stopPropagation(); arizaDuzenle(${a.id})" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button>
+                        <button onclick="event.stopPropagation(); arizaSil(${a.id})" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium"><i class="fa-solid fa-trash"></i> Sil</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        async function openArizaDetay(id) {
+            const a = _arizaCache.find(x => x.id == id);
+            if (!a) return;
+            openModal('arizaModal');
+            const box = document.getElementById('arizaIcerik');
+
+            // Teknik personel listesini çek (atama için)
+            let teknikler = [];
+            try { teknikler = ((await (await apiFetch('admin/personeller.php')).json()).data || []).filter(p => p.rol === 'teknik'); } catch (_) {}
+
+            // Bu arızaya bağlı masraflar
+            let masraflar = [];
+            try { masraflar = (await (await apiFetch('admin/masraflar.php?ariza_id=' + id)).json()).data || []; } catch (_) {}
+            let masrafHtml = '';
+            if (masraflar.length) {
+                masrafHtml = `<div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Bu Arızaya Girilen Masraflar</p>` +
+                    masraflar.map(m => `<div class="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
+                        <span>${esc(m.kalem_adi)} <span class="text-slate-400">(${esc(m.personel_adi||'-')})</span>${m.fis_fatura_fotograf ? ` <a href="${esc(BACKEND + '/' + m.fis_fatura_fotograf)}" target="_blank" class="text-blue-600 ml-1"><i class="fa-solid fa-image"></i> Fiş</a>` : ''}</span>
+                        <span class="font-medium">${paraTL(m.tutar)} ${durumBadge(m.durum)}</span>
+                    </div>`).join('') + `</div>`;
+            }
+
+            let fotoHtml = '<span class="text-slate-400 italic">Fotoğraf yok</span>';
+            if (a.fotograf_url) {
+                const url = esc(`${BACKEND}/${a.fotograf_url}`);
+                fotoHtml = `<a href="${url}" target="_blank"><img src="${url}" class="rounded-xl border border-slate-200 max-h-64 object-contain"></a>`;
+            }
+
+            let cozumFotoHtml = '';
+            if (a.cozum_fotograf_url) {
+                const curl = esc(`${BACKEND}/${a.cozum_fotograf_url}`);
+                cozumFotoHtml = `<div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Çözüm Fotoğrafı</p><a href="${curl}" target="_blank"><img src="${curl}" class="rounded-xl border-2 border-emerald-200 max-h-64 object-contain"></a></div>`;
+            }
+
+            const teknikOpts = ['<option value="">— Teknik seç —</option>']
+                .concat(teknikler.map(t => `<option value="${t.id}" ${String(a.teknik_personel_id) === String(t.id) ? 'selected' : ''}>${esc(t.ad_soyad)}</option>`)).join('');
+            const durumlar = ['acik','bekliyor','cozuldu','iptal','dis_destek'];
+            const durumOpts = durumlar.map(d => `<option value="${d}" ${a.durum === d ? 'selected' : ''}>${(DURUM[d]||[,,d])[2]}</option>`).join('');
+
+            box.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-xl font-bold text-slate-900">${esc(a.baslik)}</h4>
+                    ${durumBadge(a.durum)}
+                </div>
+                <p class="text-slate-600 mb-4">${esc(a.aciklama || 'Açıklama yok')}</p>
+                ${a.teknik_notu ? `<div class="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-600 mr-1"></i> <span class="font-semibold text-amber-700">Teknik Notu:</span> <span class="text-slate-700">${esc(a.teknik_notu)}</span></div>` : ''}
+                <div class="grid grid-cols-2 gap-4 text-sm mb-5">
+                    <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Tesis</p><p class="text-slate-700">${esc(a.site_adi||'-')}</p></div>
+                    <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Bildiren</p><p class="text-slate-700">${esc(a.bildiren_adi||'-')}</p></div>
+                </div>
+                <div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Arıza Fotoğrafı</p>${fotoHtml}</div>
+                ${cozumFotoHtml}
+                ${masrafHtml}
+                <div class="grid grid-cols-2 gap-4 items-end border-t border-slate-100 pt-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Teknik Personel Ata</label>
+                        <select id="ariza-teknik" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white outline-none">${teknikOpts}</select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Durum</label>
+                        <select id="ariza-durum" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white outline-none">${durumOpts}</select>
+                    </div>
+                </div>
+                <div id="ariza-hata" class="text-sm text-red-500 hidden mt-3"></div>
+                <div class="flex justify-between items-center mt-4">
+                    <button onclick="arizaSil(${a.id})" class="px-4 py-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-medium"><i class="fa-solid fa-trash mr-1"></i> Sil</button>
+                    <button onclick="arizaGuncelle(${a.id})" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">Durumu Kaydet</button>
+                </div>
+            `;
+        }
+
+        async function arizaGuncelle(id) {
+            const durum = document.getElementById('ariza-durum').value;
+            const teknik = document.getElementById('ariza-teknik').value;
+            const hata = document.getElementById('ariza-hata');
+            hata.classList.add('hidden');
+            try {
+                const res = await apiFetch('admin/ariza_guncelle.php', {
+                    method: 'POST',
+                    body: JSON.stringify({ id, durum, teknik_personel_id: teknik }),
+                });
+                const data = await res.json();
+                if (res.ok) { closeModal('arizaModal'); loadArizalar(); toast('Arıza durumu güncellendi.', 'success'); }
+                else { hata.innerText = data.message || 'Güncellenemedi.'; hata.classList.remove('hidden'); }
+            } catch (e) { hata.innerText = 'Sunucuya bağlanılamadı.'; hata.classList.remove('hidden'); }
+        }
+
+        // ---- MASRAFLAR ----
+        let _masrafListe = [];
+        async function loadMasraflar() {
+            const tbody = document.getElementById('masraflar-tbody');
+            const filtre = document.getElementById('masraf-filtre').value;
+            document.getElementById('arama-masraflar').innerHTML = aramaKutusu('masraflar', 'renderMasraflar', 'Kalem veya personel...');
+            tbody.innerHTML = skeletonSatir(7);
+            try {
+                let path = 'admin/masraflar.php';
+                if (filtre) path += `?durum=${encodeURIComponent(filtre)}`;
+                _masrafListe = (await (await apiFetch(path)).json()).data || [];
+                renderMasraflar();
+            } catch (e) { tbody.innerHTML = bosDurum(7, 'fa-triangle-exclamation', 'Yüklenemedi', 'Masraf kayıtları alınamadı.'); console.error(e); }
+        }
+        function renderMasraflar() {
+            const tbody = document.getElementById('masraflar-tbody');
+            const liste = tabloUygula('masraflar', _masrafListe, ['kalem_adi', 'personel_adi']);
+            if (!liste.length) {
+                tbody.innerHTML = _masrafListe.length
+                    ? bosDurum(7, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Arama/filtreye uygun masraf yok.')
+                    : bosDurum(7, 'fa-receipt', 'Masraf kaydı yok', 'Teknik personel masraf girdikçe burada görünür ve onaya düşer.');
+                return;
+            }
+            tbody.innerHTML = liste.map(m => {
+                const ilgili = m.is_emri_baslik || m.ariza_baslik || '-';
+                const fis = m.fis_fatura_fotograf
+                    ? `<a href="${esc(BACKEND + '/' + m.fis_fatura_fotograf)}" target="_blank" class="text-blue-600 hover:underline"><i class="fa-solid fa-image"></i> Gör</a>`
+                    : '<span class="text-slate-400">-</span>';
+                const islem = (m.durum === 'bekliyor'
+                    ? `<button onclick="masrafIslem(${m.id},'onayla')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium mr-1">Onayla</button>
+                       <button onclick="masrafIslem(${m.id},'reddet')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium mr-1">Reddet</button>`
+                    : '<span class="text-slate-400 text-xs mr-2">İşlendi</span>')
+                    + `<button onclick="masrafIslem(${m.id},'sil')" title="Sil" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium"><i class="fa-solid fa-trash"></i></button>`;
+                return `<tr class="hover:bg-slate-50/50">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(m.kalem_adi)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(m.personel_adi||'-')}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(ilgili)}${m.site_adi ? ` <span class="text-slate-400">· ${esc(m.site_adi)}</span>` : ''}</td>
+                    <td class="px-6 py-4 font-medium">${paraTL(m.tutar)}</td>
+                    <td class="px-6 py-4">${fis}</td>
+                    <td class="px-6 py-4">${durumBadge(m.durum)}</td>
+                    <td class="px-6 py-4 text-right">${islem}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function masrafIslem(id, islem) {
+            if (islem === 'sil' && !await onayla('Masrafı sil', 'Bu masraf kaydı silinsin mi? Bu işlem geri alınamaz.', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/masraflar.php', {
+                    method: 'POST',
+                    body: JSON.stringify({ id, islem }),
+                });
+                if (res.ok) { loadMasraflar(); toast(islem === 'onayla' ? 'Masraf onaylandı.' : islem === 'reddet' ? 'Masraf reddedildi.' : 'Masraf silindi.', 'success'); }
+                else { const d = await res.json().catch(() => ({})); toast(d.message || 'İşlem başarısız.', 'error'); }
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        // ---- Yeni Arıza / Düzenle (Yönetici) ----
+        let _arizaEditId = null;
+        async function openArizaEkleModal(a = null) {
+            _arizaEditId = a ? a.id : null;
+            const form = document.getElementById('arizaEkleForm');
+            form.reset();
+            document.getElementById('arizaEkleModalBaslik').innerText = a ? 'Arızayı Düzenle' : 'Yeni Arıza';
+            document.getElementById('arizaEkleSubmitBtn').innerText = a ? 'Değişiklikleri Kaydet' : 'Oluştur';
+            openModal('arizaEkleModal');
+            try {
+                const [siteler, personeller] = await Promise.all([
+                    (await apiFetch('admin/siteler.php')).json().then(d => d.data || []),
+                    (await apiFetch('admin/personeller.php')).json().then(d => d.data || []),
+                ]);
+                const teknikler = personeller.filter(p => p.rol === 'teknik');
+                const siteSel = document.querySelector('#arizaEkleForm select[name=site_id]');
+                const tekSel = document.querySelector('#arizaEkleForm select[name=teknik_personel_id]');
+                siteSel.innerHTML = siteler.length ? siteler.map(s => `<option value="${s.id}">${esc(s.ad)}</option>`).join('') : '<option value="">Önce site ekleyin</option>';
+                tekSel.innerHTML = '<option value="">— Atama yapma —</option>' + teknikler.map(t => `<option value="${t.id}">${esc(t.ad_soyad)}</option>`).join('');
+
+                if (a) {
+                    form.baslik.value = a.baslik || '';
+                    form.aciklama.value = a.aciklama || '';
+                    // site/teknik seçimini doğrudan ID ile eşle (aynı isimli kayıtlarda güvenilir)
+                    if (a.site_id != null) siteSel.value = String(a.site_id);
+                    if (a.teknik_personel_id != null) tekSel.value = String(a.teknik_personel_id);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function arizaDuzenle(id) {
+            const a = _arizaCache.find(x => String(x.id) === String(id));
+            if (a) openArizaEkleModal(a);
+        }
+
+        async function arizaSil(id) {
+            if (!await onayla('Arızayı sil', 'Bu arıza kaydı silinsin mi? Bağlı masraf kayıtları da silinir. Bu işlem geri alınamaz.', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/ariza_guncelle.php', { method: 'POST', body: JSON.stringify({ id, islem: 'sil' }) });
+                const d = await res.json().catch(() => ({}));
+                if (res.ok) { closeModal('arizaModal'); loadArizalar(); toast('Arıza silindi.', 'success'); }
+                else toast(d.message || 'Silinemedi.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        document.getElementById('arizaEkleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = Object.fromEntries(new FormData(e.target).entries());
+            // Düzenleme: ariza_guncelle (başlık/açıklama/tesis/teknik), oluşturma: ariza_ekle
+            const editing = !!_arizaEditId;
+            const url = editing ? 'admin/ariza_guncelle.php' : 'admin/ariza_ekle.php';
+            if (editing) payload.id = _arizaEditId;
+            try {
+                const res = await apiFetch(url, { method: 'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) { closeModal('arizaEkleModal'); e.target.reset(); const ed = editing; _arizaEditId = null; loadArizalar(); toast(ed ? 'Arıza güncellendi.' : 'Arıza oluşturuldu.', 'success'); }
+                else formHata(e.target, data.message || 'İşlem başarısız.');
+            } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
+        });
+
+        // ---- İş Emri Modalı (r verilirse düzenleme, yoksa yeni) ----
+        let _isEmriEditId = null;
+        async function openIsEmriModal(r = null) {
+            _isEmriEditId = r ? r.id : null;
+            const form = document.getElementById('isEmriForm');
+            form.reset();
+            document.getElementById('isEmriModalBaslik').innerText = r ? 'İş Emrini Düzenle' : 'Yeni İş Emri';
+            document.getElementById('isEmriSubmitBtn').innerText = r ? 'Değişiklikleri Kaydet' : 'Oluştur ve Ata';
+            openModal('isEmriModal');
+            try {
+                const [siteler, personeller] = await Promise.all([
+                    (await apiFetch('admin/siteler.php')).json().then(d => d.data || []),
+                    (await apiFetch('admin/personeller.php')).json().then(d => d.data || []),
+                ]);
+                const siteSel = document.querySelector('#isEmriForm select[name=site_id]');
+                const persSel = document.querySelector('#isEmriForm select[name=personel_id]');
+                siteSel.innerHTML = siteler.length ? siteler.map(s => `<option value="${s.id}">${esc(s.ad)}</option>`).join('') : '<option value="">Önce site ekleyin</option>';
+                persSel.innerHTML = personeller.length ? personeller.map(p => `<option value="${p.id}">${esc(p.ad_soyad)} (${esc(p.rol)})</option>`).join('') : '<option value="">Önce personel ekleyin</option>';
+
+                if (r) {
+                    form.baslik.value = r.baslik || '';
+                    form.aciklama.value = r.aciklama || '';
+                    form.qr_kod.value = r.qr_kod || '';
+                    siteSel.value = r.site_id;
+                    persSel.value = r.personel_id;
+                    // "YYYY-MM-DD HH:MM:SS" -> datetime-local "YYYY-MM-DDTHH:MM"
+                    form.planlanan_baslangic_tarihi.value = r.planlanan_baslangic_tarihi
+                        ? r.planlanan_baslangic_tarihi.replace(' ', 'T').slice(0, 16) : '';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ---- İş Emri Detay ----
+        const paraTL = (n) => Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+
+        async function openIsEmriDetay(id) {
+            openModal('detayModal');
+            const box = document.getElementById('detayIcerik');
+            box.innerHTML = `<div class="text-center text-slate-400 py-10">Yükleniyor...</div>`;
+            try {
+                const r = (await (await apiFetch('admin/is_emri_detay.php?id=' + id)).json()).data;
+
+                // Tamamlanma konumu / harita
+                let konumHtml = '<span class="text-slate-400 italic">Henüz tamamlanmadı</span>';
+                if (r.tamamlanma_enlem && r.tamamlanma_boylam) {
+                    const harita = `https://www.google.com/maps?q=${r.tamamlanma_enlem},${r.tamamlanma_boylam}`;
+                    konumHtml = `${esc(r.tamamlanma_enlem)}, ${esc(r.tamamlanma_boylam)}
+                        <a href="${harita}" target="_blank" class="ml-2 text-blue-600 hover:underline text-sm"><i class="fa-solid fa-map-location-dot"></i> Haritada Aç</a>`;
+                }
+
+                // Kapanış fotoğrafı
+                let fotoHtml = '<span class="text-slate-400 italic">Fotoğraf yok</span>';
+                if (r.kapanis_fotograf_url) {
+                    const url = esc(`${BACKEND}/${r.kapanis_fotograf_url}`);
+                    fotoHtml = `<a href="${url}" target="_blank"><img src="${url}" class="rounded-xl border border-slate-200 max-h-72 object-contain"></a>`;
+                }
+
+                // Checklist
+                let checklistHtml = '<span class="text-slate-400 italic text-sm">Checklist tanımlı değil</span>';
+                if (r.alt_gorevler && r.alt_gorevler.length) {
+                    checklistHtml = '<ul class="space-y-1">' + r.alt_gorevler.map(a =>
+                        `<li class="flex items-center gap-2 text-sm"><i class="fa-solid ${a.yapildi_mi == 1 ? 'fa-circle-check text-emerald-500' : 'fa-circle text-slate-300'}"></i> ${esc(a.gorev_metni)}</li>`
+                    ).join('') + '</ul>';
+                }
+
+                // Masraflar
+                let masrafHtml = '';
+                if (r.masraflar && r.masraflar.length) {
+                    masrafHtml = `<div class="mt-5"><p class="text-xs font-semibold text-slate-400 uppercase mb-2">Masraflar</p>` +
+                        r.masraflar.map(m => `<div class="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
+                            <span>${esc(m.kalem_adi)} <span class="text-slate-400">(${esc(m.personel_adi||'-')})</span></span>
+                            <span class="font-medium">${paraTL(m.tutar)} ${durumBadge(m.durum)}</span>
+                        </div>`).join('') + `</div>`;
+                }
+
+                box.innerHTML = `
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-xl font-bold text-slate-900">${esc(r.baslik)}</h4>
+                        ${durumBadge(r.durum)}
+                    </div>
+                    <p class="text-slate-600 mb-5">${esc(r.aciklama || 'Açıklama yok')}</p>
+                    <div class="grid grid-cols-2 gap-4 text-sm mb-5">
+                        <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Tesis</p><p class="text-slate-700">${esc(r.site_adi||'-')}</p></div>
+                        <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Personel</p><p class="text-slate-700">${esc(r.personel_adi||'-')} ${r.personel_telefon ? '· '+esc(r.personel_telefon) : ''}</p></div>
+                        <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Oluşturulma</p><p class="text-slate-700">${formatTarih(r.olusturma_tarihi)}</p></div>
+                        <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Tamamlanma</p><p class="text-slate-700">${formatTarih(r.tamamlanma_tarihi)}</p></div>
+                    </div>
+                    <div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-1">Tamamlanma Konumu (GPS)</p><p class="text-slate-700">${konumHtml}</p></div>
+                    <div class="mb-2"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Kapanış Fotoğrafı</p>${fotoHtml}</div>
+                    <div class="mt-5"><p class="text-xs font-semibold text-slate-400 uppercase mb-2">Checklist</p>${checklistHtml}</div>
+                    ${masrafHtml}
+                `;
+            } catch (e) {
+                box.innerHTML = `<div class="text-center text-red-400 py-10">Detay yüklenemedi.</div>`;
+                console.error(e);
+            }
+        }
+
+        // ---- PERİYODİK GÖREVLER ----
+        const HAFTA_GUN = { 1:'Pazartesi', 2:'Salı', 3:'Çarşamba', 4:'Perşembe', 5:'Cuma', 6:'Cumartesi', 7:'Pazar' };
+        function tekrarMetni(p) {
+            if (p.tekrar_tipi === 'gunluk') return 'Her gün';
+            if (p.tekrar_tipi === 'haftalik') return 'Haftalık · ' + (HAFTA_GUN[p.tekrar_gunu] || '-');
+            if (p.tekrar_tipi === 'aylik') return 'Aylık · ayın ' + (p.tekrar_gunu || '-') + '.';
+            return '-';
+        }
+
+        let _periyodikListe = [];
+        async function loadPeriyodik() {
+            const tbody = document.getElementById('periyodik-tbody');
+            document.getElementById('arama-periyodik').innerHTML = aramaKutusu('periyodik', 'renderPeriyodik', 'Başlık, tesis, personel...');
+            tbody.innerHTML = skeletonSatir(7);
+            try {
+                _periyodikListe = (await (await apiFetch('admin/periyodik_gorevler.php')).json()).data || [];
+                renderPeriyodik();
+            } catch (e) { tbody.innerHTML = bosDurum(7, 'fa-triangle-exclamation', 'Yüklenemedi', 'Periyodik görevler alınamadı.'); console.error(e); }
+        }
+        function renderPeriyodik() {
+            const tbody = document.getElementById('periyodik-tbody');
+            const liste = tabloUygula('periyodik', _periyodikListe, ['baslik', 'site_adi', 'personel_adi']);
+            if (!liste.length) {
+                tbody.innerHTML = _periyodikListe.length
+                    ? bosDurum(7, 'fa-magnifying-glass', 'Sonuç bulunamadı', 'Aramanıza uygun şablon yok.')
+                    : bosDurum(7, 'fa-repeat', 'Henüz şablon yok', 'Tekrarlayan görevler için şablon oluşturun; her gece otomatik iş emri üretilir.', `<button onclick="openPeriyodikModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"><i class="fa-solid fa-plus mr-1"></i> Yeni Şablon</button>`);
+                return;
+            }
+            tbody.innerHTML = liste.map(p => {
+                const aktif = p.aktif == 1;
+                const durum = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${aktif ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${aktif ? 'bg-emerald-500' : 'bg-slate-400'}"></span> ${aktif ? 'Aktif' : 'Duraklatıldı'}</span>`;
+                return `<tr class="hover:bg-slate-50/50">
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(p.baslik)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(p.site_adi||'-')}</td>
+                    <td class="px-6 py-4">${personelHucre(p.personel_adi)}</td>
+                    <td class="px-6 py-4 text-slate-600">${esc(tekrarMetni(p))}</td>
+                    <td class="px-6 py-4 text-slate-500">${p.son_uretim_tarihi ? formatTarih(p.son_uretim_tarihi) : '<span class="text-slate-400 italic">Henüz yok</span>'}</td>
+                    <td class="px-6 py-4">${durum}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="periyodikUret(${p.id})" title="Şimdi iş emri üret (geceyi bekleme)" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium mr-1"><i class="fa-solid fa-bolt"></i> Üret</button>
+                        <button onclick="periyodikDuzenle(${p.id})" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button>
+                        <button onclick="periyodikIslem(${p.id},'aktif_degistir')" class="px-3 py-1.5 rounded-lg ${aktif ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'} text-white text-xs font-medium mr-1">${aktif ? 'Duraklat' : 'Aktifleştir'}</button>
+                        <button onclick="periyodikIslem(${p.id},'sil')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium">Sil</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function periyodikIslem(id, islem) {
+            if (islem === 'sil' && !await onayla('Şablonu sil', 'Bu şablon silinsin mi? Bu şablondan üretilmiş, personelin henüz başlamadığı görevler de listesinden kaldırılır. (Başlanmış/tamamlanmış görevler korunur.)', 'Sil', 'tehlike')) return;
+            try {
+                const res = await apiFetch('admin/periyodik_gorevler.php', { method: 'POST', body: JSON.stringify({ id, islem }) });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) { loadPeriyodik(); toast(islem === 'sil' ? (data.message || 'Şablon silindi.') : 'Şablon durumu güncellendi.', 'success'); }
+                else toast(data.message || 'İşlem başarısız.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        // Şablondan hemen iş emri üret (geceyi beklemeden)
+        async function periyodikUret(id) {
+            if (!await onayla('İş emri üret', 'Bu şablondan şimdi bir iş emri oluşturulup personele atansın mı?', 'Üret ve Ata')) return;
+            try {
+                const res = await apiFetch('admin/periyodik_gorevler.php', { method: 'POST', body: JSON.stringify({ id, islem: 'uret' }) });
+                const data = await res.json();
+                if (res.ok) { toast('İş emri oluşturuldu ve personele atandı (No: ' + (data.is_emri_id || '-') + ').', 'success'); loadPeriyodik(); }
+                else toast(data.message || 'İş emri üretilemedi.', 'error');
+            } catch (e) { toast('Sunucuya bağlanılamadı.', 'error'); }
+        }
+
+        function periyodikTekrarDegisti() {
+            const tip = document.querySelector('#periyodikForm select[name=tekrar_tipi]').value;
+            document.getElementById('periyodik-haftalik-wrap').classList.toggle('hidden', tip !== 'haftalik');
+            document.getElementById('periyodik-aylik-wrap').classList.toggle('hidden', tip !== 'aylik');
+        }
+
+        let _periyodikEditId = null;
+
+        // p verilirse düzenleme modu, yoksa yeni oluşturma modu.
+        async function openPeriyodikModal(p = null) {
+            _periyodikEditId = p ? p.id : null;
+            const form = document.getElementById('periyodikForm');
+            form.reset();
+            document.getElementById('periyodikModalBaslik').innerText = p ? 'Periyodik Görevi Düzenle' : 'Yeni Periyodik Görev';
+            document.getElementById('periyodikSubmitBtn').innerText = p ? 'Değişiklikleri Kaydet' : 'Şablon Oluştur';
+            openModal('periyodikModal');
+            try {
+                const [siteler, personeller] = await Promise.all([
+                    (await apiFetch('admin/siteler.php')).json().then(d => d.data || []),
+                    (await apiFetch('admin/personeller.php')).json().then(d => d.data || []),
+                ]);
+                const siteSel = document.querySelector('#periyodikForm select[name=site_id]');
+                const persSel = document.querySelector('#periyodikForm select[name=personel_id]');
+                siteSel.innerHTML = siteler.length ? siteler.map(s => `<option value="${s.id}">${esc(s.ad)}</option>`).join('') : '<option value="">Önce site ekleyin</option>';
+                persSel.innerHTML = personeller.length ? personeller.map(pp => `<option value="${pp.id}">${esc(pp.ad_soyad)} (${esc(pp.rol)})</option>`).join('') : '<option value="">Önce personel ekleyin</option>';
+
+                if (p) {
+                    // Alanları mevcut değerlerle doldur
+                    form.baslik.value = p.baslik || '';
+                    form.aciklama.value = p.aciklama || '';
+                    form.alt_gorevler.value = p.alt_gorevler || '';
+                    siteSel.value = p.site_id;
+                    persSel.value = p.personel_id;
+                    form.tekrar_tipi.value = p.tekrar_tipi;
+                    if (p.tekrar_tipi === 'haftalik') form.tekrar_gunu_hafta.value = p.tekrar_gunu;
+                    if (p.tekrar_tipi === 'aylik') form.tekrar_gunu_ay.value = p.tekrar_gunu;
+                }
+                periyodikTekrarDegisti();
+            } catch (e) { console.error(e); }
+        }
+
+        function periyodikDuzenle(id) {
+            const p = _periyodikListe.find(x => String(x.id) === String(id));
+            if (p) openPeriyodikModal(p);
+        }
+
+        document.getElementById('periyodikForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            const payload = {
+                site_id: f.get('site_id'),
+                personel_id: f.get('personel_id'),
+                baslik: f.get('baslik'),
+                aciklama: f.get('aciklama'),
+                alt_gorevler: f.get('alt_gorevler'),
+                tekrar_tipi: f.get('tekrar_tipi'),
+            };
+            if (payload.tekrar_tipi === 'haftalik') payload.tekrar_gunu = f.get('tekrar_gunu_hafta');
+            else if (payload.tekrar_tipi === 'aylik') payload.tekrar_gunu = f.get('tekrar_gunu_ay');
+            // Düzenleme modunda güncelle, değilse oluştur
+            if (_periyodikEditId) { payload.id = _periyodikEditId; payload.islem = 'guncelle'; }
+            try {
+                const res = await apiFetch('admin/periyodik_gorevler.php', { method: 'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) { const d = _periyodikEditId; closeModal('periyodikModal'); e.target.reset(); _periyodikEditId = null; periyodikTekrarDegisti(); loadPeriyodik(); toast(d ? 'Şablon güncellendi.' : 'Periyodik şablon oluşturuldu.', 'success'); }
+                else formHata(e.target, data.message || 'İşlem başarısız.');
+            } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
+        });
+
+        // ---- Form gönderimleri ----
+        function formHata(form, msg) { const b = form.querySelector('.modal-error'); b.innerText = msg; b.classList.remove('hidden'); }
+
+        document.getElementById('isEmriForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = Object.fromEntries(new FormData(e.target).entries());
+            if (payload.planlanan_baslangic_tarihi) payload.planlanan_baslangic_tarihi = payload.planlanan_baslangic_tarihi.replace('T',' ') + ':00';
+            if (_isEmriEditId) { payload.id = _isEmriEditId; payload.islem = 'guncelle'; }
+            try {
+                const res = await apiFetch('admin/is_emirleri.php', { method:'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) { const d = _isEmriEditId; closeModal('isEmriModal'); e.target.reset(); _isEmriEditId = null; loadDashboard(); if(!document.getElementById('view-isemirleri').classList.contains('hidden')) loadIsEmirleri(); toast(d ? 'İş emri güncellendi.' : 'İş emri oluşturuldu ve atandı.', 'success'); }
+                else formHata(e.target, data.message || 'İşlem başarısız.');
+            } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
+        });
+
+        document.getElementById('personelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = Object.fromEntries(new FormData(e.target).entries());
+            if (_personelEditId) {
+                payload.id = _personelEditId; payload.islem = 'guncelle';
+                if (!payload.sifre || !payload.sifre.trim()) delete payload.sifre; // boşsa şifreye dokunma
+            }
+            try {
+                const res = await apiFetch('admin/personeller.php', { method:'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) { const d = _personelEditId; closeModal('personelModal'); e.target.reset(); _personelEditId = null; loadPersoneller(); toast(d ? 'Personel güncellendi.' : 'Personel eklendi.', 'success'); }
+                else formHata(e.target, data.message || 'İşlem başarısız.');
+            } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
+        });
+
+        document.getElementById('siteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = Object.fromEntries(new FormData(e.target).entries());
+            if (_siteEditId) { payload.id = _siteEditId; payload.islem = 'guncelle'; }
+            try {
+                const res = await apiFetch('admin/siteler.php', { method:'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) { const d = _siteEditId; closeModal('siteModal'); e.target.reset(); _siteEditId = null; loadSiteler(); toast(d ? 'Tesis güncellendi.' : 'Tesis eklendi.', 'success'); }
+                else formHata(e.target, data.message || 'İşlem başarısız.');
+            } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
+        });
+
+        // ---- Başlangıç ----
+        (function init() {
+            _temaIkonGuncelle();
+            try { const u = JSON.parse(localStorage.getItem('glow_user') || '{}'); if (u.ad_soyad) { document.getElementById('user-name').innerText = u.ad_soyad; document.getElementById('user-avatar').innerText = bashar(u.ad_soyad) || '?'; } } catch (_) {}
+            switchView('dashboard');
+        })();
+    </script>
+</body>
+</html>

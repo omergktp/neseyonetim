@@ -1,0 +1,5 @@
+# Proje kökü web'den servis edildiği için hassas dosya türlerine erişimi kapat.
+# (Şema, dokümantasyon, anahtar/yapılandırma dosyaları tarayıcıdan indirilemesin.)
+<FilesMatch "\.(sql|md|json|lock|ya?ml|ini|log)$">
+    Require all denied
+</FilesMatch>

@@ -1,0 +1,31 @@
+# --- Gizli anahtarlar / yapılandırma (ASLA commit edilmez) ---
+backend/secrets/
+backend/config.php
+*firebase-adminsdk*.json
+fcm-service-account.json
+
+# --- Kullanıcı verisi ---
+backend/uploads/
+db/backups/
+
+# --- Flutter / Android build çıktıları ---
+mobile/build/
+mobile/.dart_tool/
+mobile/.gradle/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/google-services.json
+mobile/*.iml
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# --- Editör / sistem ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.log
+
+# --- Claude yerel ayarları ---
+.claude/settings.local.json

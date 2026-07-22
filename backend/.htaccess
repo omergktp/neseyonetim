@@ -1,0 +1,4 @@
+# Hassas dosyalara doğrudan web erişimini engelle (servis hesabı anahtarı, config vb.)
+<FilesMatch "\.(json|md|sql)$">
+    Require all denied
+</FilesMatch>
