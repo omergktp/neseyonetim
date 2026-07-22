@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  flutter:
+    name: Flutter analiz + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+      - name: Statik analiz
+        run: flutter analyze
+      - name: Testler
+        run: flutter test
+
+  php-lint:
+    name: PHP sözdizimi kontrolü
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Tüm backend PHP dosyalarını lint'le
+        run: |
+          hata=0
+          while IFS= read -r -d '' dosya; do
+            php -l "$dosya" > /dev/null || { echo "SYNTAX HATASI: $dosya"; hata=1; }
+          done < <(find backend -name '*.php' -print0)
+          exit $hata

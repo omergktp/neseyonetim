@@ -27,6 +27,10 @@ class SyncService {
     return _isOnline(results);
   }
 
+  /// Test dikişi: birim testte gerçek connectivity eklentisi çalışmaz;
+  /// test sahte bir kontrol enjekte eder. Üretimde daima hasInternet'tir.
+  static Future<bool> Function() internetKontrol = hasInternet;
+
   /// Uygulama açılışında çağrılır. Bağlantı değişimlerini dinlemeye başlar
   /// ve açılışta bekleyen kuyruğu bir kez göndermeyi dener.
   static void startListening() {
@@ -57,7 +61,7 @@ class SyncService {
 
     try {
       // İnternet yoksa hiç uğraşma
-      if (!await hasInternet()) return 0;
+      if (!await internetKontrol()) return 0;
 
       final items = await OfflineQueue.getQueue();
       for (final item in items) {
