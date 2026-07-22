@@ -60,6 +60,12 @@ if (isset($data->site_id) && $data->site_id !== '') {
     $params[':site_id'] = $sid;
 }
 
+// Öncelik güncelle
+if (isset($data->oncelik) && in_array($data->oncelik, ['dusuk', 'normal', 'yuksek'], true)) {
+    $set[] = "oncelik = :oncelik";
+    $params[':oncelik'] = $data->oncelik;
+}
+
 // Durum güncelle
 if (isset($data->durum)) {
     if (!in_array($data->durum, ['acik', 'bekliyor', 'cozuldu', 'iptal', 'dis_destek'], true)) {

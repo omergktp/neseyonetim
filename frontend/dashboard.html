@@ -202,22 +202,30 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
-                        <div class="w-14 h-14 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-clipboard-check"></i></div>
-                        <div><p class="text-sm text-slate-500 font-medium mb-1">Tamamlanan İş</p><h3 id="stat-tamamlanan" class="text-2xl font-bold text-slate-800">-</h3></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl"><i class="fa-solid fa-clipboard-check"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Tamamlanan İş</p><h3 id="stat-tamamlanan" class="text-xl font-bold text-slate-800">-</h3></div>
                     </div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
-                        <div class="w-14 h-14 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-spinner"></i></div>
-                        <div><p class="text-sm text-slate-500 font-medium mb-1">Devam Eden İş</p><h3 id="stat-devam" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl"><i class="fa-solid fa-spinner"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Devam Eden İş</p><h3 id="stat-devam" class="text-xl font-bold text-slate-800">-</h3></div>
                     </div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
-                        <div class="w-14 h-14 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-2xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                        <div><p class="text-sm text-slate-500 font-medium mb-1">Açık Arızalar</p><h3 id="stat-ariza" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    <div id="kart-geciken" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Geciken İş</p><h3 id="stat-geciken" class="text-xl font-bold text-slate-800">-</h3></div>
                     </div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-5">
-                        <div class="w-14 h-14 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl"><i class="fa-solid fa-users"></i></div>
-                        <div><p class="text-sm text-slate-500 font-medium mb-1">Aktif Personel</p><h3 id="stat-personel" class="text-2xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Açık Arızalar</p><h3 id="stat-ariza" class="text-xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl"><i class="fa-solid fa-stopwatch"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Ort. Çözüm (30g)</p><h3 id="stat-cozum" class="text-xl font-bold text-slate-800">-</h3></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Aktif Personel</p><h3 id="stat-personel" class="text-xl font-bold text-slate-800">-</h3></div>
                     </div>
                 </div>
 
@@ -419,6 +427,7 @@
                 <div><label class="block text-sm font-medium text-slate-600 mb-1">Açıklama</label><textarea name="aciklama" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="İsteğe bağlı detay"></textarea></div>
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="block text-sm font-medium text-slate-600 mb-1">Planlanan Başlangıç</label><input name="planlanan_baslangic_tarihi" type="datetime-local" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Termin (Son Tarih)</label><input name="termin_tarihi" type="date" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"><p class="text-[11px] text-slate-400 mt-1">Bu tarih geçince iş "geciken" sayılır.</p></div>
                     <div><label class="block text-sm font-medium text-slate-600 mb-1">QR Kod (opsiyonel)</label><input name="qr_kod" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Tesisteki QR değeri"></div>
                 </div>
                 <p class="text-xs text-slate-400">QR girilirse personel sahadaki bu kodu okutarak görevi başlatır. Boşsa konumla başlatılır.</p>
@@ -489,6 +498,12 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="block text-sm font-medium text-slate-600 mb-1">Tesis *</label><select name="site_id" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
                     <div><label class="block text-sm font-medium text-slate-600 mb-1">Teknik Personel</label><select name="teknik_personel_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"></select></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Öncelik</label><select name="oncelik" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                        <option value="normal" selected>Normal</option><option value="yuksek">Yüksek (Acil)</option><option value="dusuk">Düşük</option>
+                    </select></div>
+                    <div></div>
                 </div>
                 <div><label class="block text-sm font-medium text-slate-600 mb-1">Açıklama</label><textarea name="aciklama" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="İsteğe bağlı detay"></textarea></div>
                 <p class="text-xs text-slate-400">Teknik personel seçilirse arıza ona atanır ve bildirim gönderilir.</p>
@@ -816,6 +831,15 @@
                 document.getElementById('stat-devam').innerText = s.devam_eden_is;
                 document.getElementById('stat-ariza').innerText = s.acik_ariza;
                 document.getElementById('stat-personel').innerText = s.aktif_personel;
+                // SLA göstergeleri: geciken iş varsa kart kırmızıya döner
+                const gecikenEl = document.getElementById('stat-geciken');
+                gecikenEl.innerText = s.geciken_is ?? 0;
+                gecikenEl.className = (s.geciken_is > 0)
+                    ? 'text-xl font-bold text-rose-600' : 'text-xl font-bold text-slate-800';
+                document.getElementById('kart-geciken').classList.toggle('ring-2', s.geciken_is > 0);
+                document.getElementById('kart-geciken').classList.toggle('ring-rose-200', s.geciken_is > 0);
+                document.getElementById('stat-cozum').innerText =
+                    s.ort_cozum_saat != null ? `${s.ort_cozum_saat} sa` : '—';
 
                 const sites = data.site_ozet || [];
 
@@ -1083,9 +1107,17 @@
                     : bosDurum(6, 'fa-clipboard-list', 'İş emri yok', 'Seçili duruma uygun iş emri bulunmuyor.', `<button onclick="openIsEmriModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"><i class="fa-solid fa-plus mr-1"></i> Yeni İş Emri</button>`);
                 return;
             }
+            const bugun = new Date().toISOString().slice(0, 10);
+            const terminEtiketi = (r) => {
+                if (!r.termin_tarihi) return '';
+                const gecikti = (r.durum === 'bekliyor' || r.durum === 'devam_ediyor') && r.termin_tarihi < bugun;
+                return gecikti
+                    ? `<span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-600"><i class="fa-solid fa-hourglass-end"></i> Gecikti</span>`
+                    : `<span class="block text-[11px] text-slate-400 mt-0.5">Termin: ${formatTarih(r.termin_tarihi)}</span>`;
+            };
             tbody.innerHTML = liste.map(r => `
                 <tr class="hover:bg-slate-50/50 cursor-pointer" onclick="openIsEmriDetay(${r.id})">
-                    <td class="px-6 py-4 font-medium text-slate-800">${esc(r.baslik)}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(r.baslik)}${terminEtiketi(r)}</td>
                     <td class="px-6 py-4 text-slate-600">${esc(r.site_adi||'-')}</td>
                     <td class="px-6 py-4">${personelHucre(r.personel_adi)}</td>
                     <td class="px-6 py-4">${durumBadge(r.durum)}</td>
@@ -1132,9 +1164,12 @@
                     : bosDurum(6, 'fa-wrench', 'Arıza kaydı yok', 'Sahadan bildirim geldikçe arızalar burada listelenir.');
                 return;
             }
+            const oncelikRozet = (o) => o === 'yuksek'
+                ? `<span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-600"><i class="fa-solid fa-bolt"></i> Acil</span>`
+                : (o === 'dusuk' ? `<span class="ml-2 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-500">Düşük</span>` : '');
             tbody.innerHTML = liste.map(a => `
                 <tr class="hover:bg-slate-50/50 cursor-pointer" onclick="openArizaDetay(${a.id})">
-                    <td class="px-6 py-4 font-medium text-slate-800">${esc(a.baslik)}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800">${esc(a.baslik)}${oncelikRozet(a.oncelik)}</td>
                     <td class="px-6 py-4 text-slate-600">${esc(a.site_adi||'-')}</td>
                     <td class="px-6 py-4 text-slate-600">${esc(a.bildiren_adi||'-')}</td>
                     <td class="px-6 py-4">${personelHucre(a.teknik_adi)}</td>
@@ -1199,14 +1234,22 @@
                 <div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Arıza Fotoğrafı</p>${fotoHtml}</div>
                 ${cozumFotoHtml}
                 ${masrafHtml}
-                <div class="grid grid-cols-2 gap-4 items-end border-t border-slate-100 pt-4">
+                <div class="grid grid-cols-3 gap-3 items-end border-t border-slate-100 pt-4">
                     <div>
-                        <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Teknik Personel Ata</label>
+                        <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Teknik Personel</label>
                         <select id="ariza-teknik" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white outline-none">${teknikOpts}</select>
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Durum</label>
                         <select id="ariza-durum" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white outline-none">${durumOpts}</select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 uppercase font-semibold mb-1">Öncelik</label>
+                        <select id="ariza-oncelik" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white outline-none">
+                            <option value="dusuk" ${a.oncelik === 'dusuk' ? 'selected' : ''}>Düşük</option>
+                            <option value="normal" ${(!a.oncelik || a.oncelik === 'normal') ? 'selected' : ''}>Normal</option>
+                            <option value="yuksek" ${a.oncelik === 'yuksek' ? 'selected' : ''}>Yüksek (Acil)</option>
+                        </select>
                     </div>
                 </div>
                 <div id="ariza-hata" class="text-sm text-red-500 hidden mt-3"></div>
@@ -1220,12 +1263,13 @@
         async function arizaGuncelle(id) {
             const durum = document.getElementById('ariza-durum').value;
             const teknik = document.getElementById('ariza-teknik').value;
+            const oncelik = document.getElementById('ariza-oncelik').value;
             const hata = document.getElementById('ariza-hata');
             hata.classList.add('hidden');
             try {
                 const res = await apiFetch('admin/ariza_guncelle.php', {
                     method: 'POST',
-                    body: JSON.stringify({ id, durum, teknik_personel_id: teknik }),
+                    body: JSON.stringify({ id, durum, teknik_personel_id: teknik, oncelik }),
                 });
                 const data = await res.json();
                 if (res.ok) { closeModal('arizaModal'); loadArizalar(); toast('Arıza durumu güncellendi.', 'success'); }
@@ -1313,6 +1357,7 @@
                 if (a) {
                     form.baslik.value = a.baslik || '';
                     form.aciklama.value = a.aciklama || '';
+                    form.oncelik.value = a.oncelik || 'normal';
                     // site/teknik seçimini doğrudan ID ile eşle (aynı isimli kayıtlarda güvenilir)
                     if (a.site_id != null) siteSel.value = String(a.site_id);
                     if (a.teknik_personel_id != null) tekSel.value = String(a.teknik_personel_id);
@@ -1378,6 +1423,7 @@
                     // "YYYY-MM-DD HH:MM:SS" -> datetime-local "YYYY-MM-DDTHH:MM"
                     form.planlanan_baslangic_tarihi.value = r.planlanan_baslangic_tarihi
                         ? r.planlanan_baslangic_tarihi.replace(' ', 'T').slice(0, 16) : '';
+                    form.termin_tarihi.value = r.termin_tarihi || '';
                 }
             } catch (e) { console.error(e); }
         }

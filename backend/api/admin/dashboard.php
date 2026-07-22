@@ -45,6 +45,28 @@ $ariza_stat = $db->prepare($ariza_sql);
 $ariza_stat->execute($ariza_params);
 $acik_ariza = (int)$ariza_stat->fetch(PDO::FETCH_ASSOC)['acik_ariza'];
 
+// SLA: Geciken işler — termin tarihi geçmiş ama hâlâ kapanmamış iş emirleri
+$gec_sql = "SELECT COUNT(*) FROM is_emirleri
+            WHERE firma_id = :firma_id AND durum IN ('bekliyor', 'devam_ediyor')
+              AND termin_tarihi IS NOT NULL AND termin_tarihi < CURDATE()";
+$gec_params = [':firma_id' => $firma_id];
+if ($site_id !== null) { $gec_sql .= " AND site_id = :sid"; $gec_params[':sid'] = $site_id; }
+$gec = $db->prepare($gec_sql);
+$gec->execute($gec_params);
+$geciken_is = (int)$gec->fetchColumn();
+
+// SLA: Son 30 günde çözülen arızaların ortalama çözüm süresi (saat)
+$sure_sql = "SELECT AVG(TIMESTAMPDIFF(HOUR, olusturma_tarihi, cozum_tarihi))
+             FROM arizalar
+             WHERE firma_id = :firma_id AND durum = 'cozuldu'
+               AND cozum_tarihi IS NOT NULL AND cozum_tarihi >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+$sure_params = [':firma_id' => $firma_id];
+if ($site_id !== null) { $sure_sql .= " AND site_id = :sid"; $sure_params[':sid'] = $site_id; }
+$sure = $db->prepare($sure_sql);
+$sure->execute($sure_params);
+$ort = $sure->fetchColumn();
+$ort_cozum_saat = $ort !== null ? round((float)$ort, 1) : null;
+
 // Aktif personel (firma geneli — personel tesise bağlı değil)
 $personel_stat = $db->prepare("SELECT COUNT(*) AS aktif_personel FROM personeller WHERE firma_id = :firma_id AND aktif = 1");
 $personel_stat->execute([':firma_id' => $firma_id]);
@@ -85,6 +107,8 @@ json_out(200, [
         "bekleyen_is"     => (int)($is['bekleyen'] ?? 0),
         "acik_ariza"      => $acik_ariza,
         "aktif_personel"  => $aktif_personel,
+        "geciken_is"      => $geciken_is,
+        "ort_cozum_saat"  => $ort_cozum_saat, // son 30 gün, null = veri yok
     ],
     "secili_site_id"  => $site_id,
     "site_ozet"       => $site_ozet,

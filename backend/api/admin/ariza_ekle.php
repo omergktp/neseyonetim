@@ -20,6 +20,8 @@ if (!isset($data->site_id, $data->baslik) || trim($data->baslik) === '') {
 $site_id = (int)$data->site_id;
 $baslik = trim($data->baslik);
 $aciklama = isset($data->aciklama) ? trim($data->aciklama) : null;
+$oncelik = (isset($data->oncelik) && in_array($data->oncelik, ['dusuk', 'normal', 'yuksek'], true))
+            ? $data->oncelik : 'normal';
 
 // KURAL 1: Site bu firmaya mı ait?
 $kontrol = $db->prepare("SELECT id FROM siteler WHERE id = :sid AND firma_id = :fid");
@@ -41,8 +43,8 @@ if (isset($data->teknik_personel_id) && $data->teknik_personel_id !== '') {
 
 // bildiren_personel_id NOT NULL: yönetici kaydı bildiren olarak yazılır
 $stmt = $db->prepare("
-    INSERT INTO arizalar (firma_id, site_id, bildiren_personel_id, teknik_personel_id, baslik, aciklama, durum)
-    VALUES (:firma_id, :site_id, :bildiren, :teknik, :baslik, :aciklama, 'acik')
+    INSERT INTO arizalar (firma_id, site_id, bildiren_personel_id, teknik_personel_id, baslik, aciklama, durum, oncelik)
+    VALUES (:firma_id, :site_id, :bildiren, :teknik, :baslik, :aciklama, 'acik', :oncelik)
 ");
 $stmt->execute([
     ':firma_id' => $firma_id,
@@ -51,6 +53,7 @@ $stmt->execute([
     ':teknik' => $teknik_id,
     ':baslik' => $baslik,
     ':aciklama' => $aciklama,
+    ':oncelik' => $oncelik,
 ]);
 $yeni_id = (int)$db->lastInsertId();
 

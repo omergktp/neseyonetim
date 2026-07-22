@@ -13,7 +13,7 @@ $durum = $_GET['durum'] ?? null;
 
 $sql = "
     SELECT
-        a.id, a.baslik, a.aciklama, a.teknik_notu, a.durum, a.fotograf_url, a.cozum_fotograf_url,
+        a.id, a.baslik, a.aciklama, a.teknik_notu, a.durum, a.oncelik, a.fotograf_url, a.cozum_fotograf_url,
         a.olusturma_tarihi, a.cozum_tarihi,
         a.site_id, a.teknik_personel_id,
         s.ad AS site_adi,

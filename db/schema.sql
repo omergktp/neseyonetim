@@ -184,3 +184,11 @@ ALTER TABLE arizalar
 ALTER TABLE malzeme_talepleri
     ADD INDEX idx_mt_firma_durum (firma_id, durum),
     ADD INDEX idx_mt_firma_tarih (firma_id, olusturma_tarihi);
+
+-- 11. SLA / GECİKME TAKİBİ ALANLARI
+-- is_emirleri.termin_tarihi: işin en geç bitmesi gereken tarih (panelde "geciken işler").
+-- arizalar.oncelik: arıza önceliklendirme (yönetici atar, panelde rozet olarak görünür).
+ALTER TABLE is_emirleri
+    ADD COLUMN termin_tarihi DATE NULL AFTER planlanan_baslangic_tarihi;
+ALTER TABLE arizalar
+    ADD COLUMN oncelik ENUM('dusuk','normal','yuksek') NOT NULL DEFAULT 'normal' AFTER durum;

@@ -37,7 +37,7 @@ if ($method === 'GET') {
     $sql = "
         SELECT
             ie.id, ie.site_id, ie.personel_id, ie.baslik, ie.aciklama, ie.durum, ie.qr_kod,
-            ie.planlanan_baslangic_tarihi, ie.tamamlanma_tarihi, ie.olusturma_tarihi,
+            ie.planlanan_baslangic_tarihi, ie.termin_tarihi, ie.tamamlanma_tarihi, ie.olusturma_tarihi,
             s.ad AS site_adi,
             p.ad_soyad AS personel_adi
         FROM is_emirleri ie
@@ -93,18 +93,20 @@ if ($method === 'POST') {
             $qr_kod      = isset($data->qr_kod) && trim($data->qr_kod) !== '' ? trim($data->qr_kod) : null;
             $planlanan   = isset($data->planlanan_baslangic_tarihi) && $data->planlanan_baslangic_tarihi !== ''
                             ? $data->planlanan_baslangic_tarihi : null;
+            $termin      = isset($data->termin_tarihi) && $data->termin_tarihi !== ''
+                            ? $data->termin_tarihi : null;
 
             siteVePersonelKontrol($db, $firma_id, $site_id, $personel_id);
 
             $upd = $db->prepare("
                 UPDATE is_emirleri SET
                     site_id = :s, personel_id = :p, baslik = :b, aciklama = :a,
-                    qr_kod = :q, planlanan_baslangic_tarihi = :pl
+                    qr_kod = :q, planlanan_baslangic_tarihi = :pl, termin_tarihi = :tt
                 WHERE id = :id AND firma_id = :fid
             ");
             $upd->execute([
                 ':s' => $site_id, ':p' => $personel_id, ':b' => $baslik, ':a' => $aciklama,
-                ':q' => $qr_kod, ':pl' => $planlanan, ':id' => $id, ':fid' => $firma_id,
+                ':q' => $qr_kod, ':pl' => $planlanan, ':tt' => $termin, ':id' => $id, ':fid' => $firma_id,
             ]);
             log_action($db, $user, 'is_emri_guncelle', 'is_emri', $id);
             json_out(200, ["message" => "İş emri güncellendi."]);
@@ -125,14 +127,16 @@ if ($method === 'POST') {
     $qr_kod      = isset($data->qr_kod) && trim($data->qr_kod) !== '' ? trim($data->qr_kod) : null;
     $planlanan   = isset($data->planlanan_baslangic_tarihi) && $data->planlanan_baslangic_tarihi !== ''
                     ? $data->planlanan_baslangic_tarihi : null;
+    $termin      = isset($data->termin_tarihi) && $data->termin_tarihi !== ''
+                    ? $data->termin_tarihi : null;
 
     siteVePersonelKontrol($db, $firma_id, $site_id, $personel_id);
 
     $stmt = $db->prepare("
         INSERT INTO is_emirleri
-            (firma_id, site_id, personel_id, baslik, aciklama, qr_kod, durum, planlanan_baslangic_tarihi)
+            (firma_id, site_id, personel_id, baslik, aciklama, qr_kod, durum, planlanan_baslangic_tarihi, termin_tarihi)
         VALUES
-            (:firma_id, :site_id, :personel_id, :baslik, :aciklama, :qr_kod, 'bekliyor', :planlanan)
+            (:firma_id, :site_id, :personel_id, :baslik, :aciklama, :qr_kod, 'bekliyor', :planlanan, :termin)
     ");
     $stmt->execute([
         ':firma_id' => $firma_id,
@@ -142,6 +146,7 @@ if ($method === 'POST') {
         ':aciklama' => $aciklama,
         ':qr_kod' => $qr_kod,
         ':planlanan' => $planlanan,
+        ':termin' => $termin,
     ]);
     $yeni_id = (int)$db->lastInsertId();
 
