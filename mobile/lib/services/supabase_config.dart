@@ -13,8 +13,8 @@ class SupabaseConfig {
   // Proje bilgileri (Dashboard > Project Settings > API).
   static const String supabaseUrl = 'https://bfkiifbzxwhbviluyzcp.supabase.co';
 
-  // TODO: Dashboard > Project Settings > API > "anon public" anahtarını buraya koy.
-  static const String supabaseAnonKey = 'SENIN_ANON_KEY';
+  // Halka açık istemci anahtarı (publishable). Veri erişimini RLS korur.
+  static const String supabaseAnonKey = 'sb_publishable_HdcOSN5v1E4YBoQok996Mg_W1i1xnGx';
 
   static const String _prefTokenKey = 'jwt_token';
 

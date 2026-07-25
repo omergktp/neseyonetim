@@ -34,6 +34,8 @@ class ApiService {
   }
 
   /// JWT payload'ından bir claim okur (firma_id / personel_id / rol).
+  /// GoTrue token'larında özel claim'ler app_metadata altındadır; eski düz
+  /// claim'li token'larla geriye dönük uyumlu.
   static Future<String?> _claim(String key) async {
     final token = await _getToken();
     if (token == null) return null;
@@ -41,7 +43,8 @@ class ApiService {
       final parts = token.split('.');
       if (parts.length != 3) return null;
       final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
-      final v = payload[key];
+      final meta = payload['app_metadata'];
+      final v = (meta is Map ? meta[key] : null) ?? payload[key];
       return v?.toString();
     } catch (_) {
       return null;
@@ -70,6 +73,7 @@ class ApiService {
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
+    await prefs.remove('refresh_token');
     await prefs.remove('rol');
     await prefs.remove('ad_soyad');
   }
@@ -165,6 +169,9 @@ class ApiService {
       if (res.status == 200 && data is Map && data['access_token'] is String) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', data['access_token']);
+        if (data['refresh_token'] is String) {
+          await prefs.setString('refresh_token', data['refresh_token']);
+        }
         final rol = data['kullanici']?['rol'];
         if (rol != null) await prefs.setString('rol', rol.toString());
         final adSoyad = data['kullanici']?['ad_soyad'];

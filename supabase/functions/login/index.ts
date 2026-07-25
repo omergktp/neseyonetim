@@ -1,20 +1,20 @@
 // supabase/functions/login/index.ts
 //
-// Özel giriş korunuyor: firma_kodu + telefon + sifre doğrulanır ve
-// Supabase'in kabul edeceği (proje JWT secret'ı ile HS256 imzalı) bir
-// access token üretilir. Token'a firma_id / personel_id / rol claim'leri
-// gömülür; Postgres RLS bunları okuyup çok-kiracılı izolasyonu uygular.
+// Özel giriş korunuyor: firma_kodu + telefon + sifre doğrulanır; ardından
+// personel GoTrue'da bir gölge kullanıcıya eşlenir ve GERÇEK bir Supabase
+// oturumu (ES256 imzalı access token + refresh token) döndürülür. Proje
+// asimetrik imzalama anahtarları kullandığı için özel HS256 üretimi geçersiz;
+// bu köprü sayesinde PostgREST/Realtime/Storage token'ı doğrudan tanır.
 //
-// Gerekli Edge Function secret'ları:
-//   PROJECT_JWT_SECRET  -> Supabase Dashboard > Project Settings > API > JWT Secret
-//   (SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY otomatik sağlanır)
+// Özel claim'ler (firma_id / personel_id / rol) kullanıcının app_metadata'sına
+// yazılır ve her girişte tazelenir; RLS bunları app.current_* ile okur.
+//
+// Gerekli secret yok — SUPABASE_URL, SUPABASE_ANON_KEY ve
+// SUPABASE_SERVICE_ROLE_KEY otomatik sağlanır.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import bcrypt from "npm:bcryptjs@2.4.3";
 import { corsHeaders } from "../_shared/cors.ts";
-
-const TOKEN_TTL_SN = 60 * 60 * 24 * 7; // 7 gün (eski davranışla aynı)
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -23,15 +23,9 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Proje JWT secret'ından HS256 imzalama anahtarı üret.
-async function importHmacKey(secret: string): Promise<CryptoKey> {
-  return await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"],
-  );
+// Personelin GoTrue gölge kullanıcısının e-postası (gerçek posta gitmez).
+function bridgeEmail(personelId: number | string): string {
+  return `p${personelId}@personel.glowsaha.app`;
 }
 
 Deno.serve(async (req) => {
@@ -56,15 +50,13 @@ Deno.serve(async (req) => {
     );
   }
 
-  const jwtSecret = Deno.env.get("PROJECT_JWT_SECRET");
-  if (!jwtSecret) return json({ message: "Sunucu yapılandırma hatası." }, 500);
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
   // Service role ile bağlan (RLS'i atlar; giriş öncesi kimlik yok).
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
+  const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
 
   // 1) Firma
   const { data: firma, error: fErr } = await admin
@@ -80,7 +72,7 @@ Deno.serve(async (req) => {
   // 2) Personel (Multi-Tenant: firma_id + telefon)
   const { data: personel, error: pErr } = await admin
     .from("personeller")
-    .select("id, ad_soyad, sifre, rol, aktif")
+    .select("id, ad_soyad, sifre, rol, aktif, auth_user_id")
     .eq("firma_id", firma.id)
     .eq("telefon", telefon)
     .maybeSingle();
@@ -95,33 +87,66 @@ Deno.serve(async (req) => {
   const gecerli = bcrypt.compareSync(sifre, stored);
   if (!gecerli) return json({ message: "Şifre hatalı." }, 401);
 
-  // 4) Supabase uyumlu JWT üret.
-  const key = await importHmacKey(jwtSecret);
-  const now = getNumericDate(0);
-  const token = await create(
-    { alg: "HS256", typ: "JWT" },
-    {
-      // Supabase/PostgREST'in beklediği standart claim'ler
-      role: "authenticated",
-      aud: "authenticated",
-      iss: "neseyonetim-login",
-      sub: String(personel.id),
-      iat: now,
-      exp: getNumericDate(TOKEN_TTL_SN),
-      // RLS'in okuduğu özel claim'ler (app.current_* fonksiyonları)
-      firma_id: String(firma.id),
-      personel_id: String(personel.id),
-      rol: personel.rol,
-    },
-    key,
-  );
+  // 4) GoTrue gölge kullanıcısını hazırla; claim'leri her girişte tazele.
+  const email = bridgeEmail(personel.id);
+  const appMeta = {
+    firma_id: String(firma.id),
+    personel_id: String(personel.id),
+    rol: personel.rol,
+  };
 
-  // Eski login.php cevabıyla uyumlu + Supabase access_token
+  let authUserId: string | null = personel.auth_user_id;
+  if (!authUserId) {
+    const { data: created, error: cErr } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      app_metadata: appMeta,
+    });
+    if (cErr) {
+      // Kullanıcı zaten var olabilir (örn. auth_user_id kaydı kaybolduysa):
+      // magiclink üretimi kullanıcıyı e-postayla bulur, id'yi oradan alırız.
+      const { data: linkData, error: lErr } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+      });
+      if (lErr || !linkData?.user) return json({ message: "Oturum açılamadı." }, 500);
+      authUserId = linkData.user.id;
+    } else {
+      authUserId = created.user.id;
+    }
+    await admin.from("personeller").update({ auth_user_id: authUserId }).eq("id", personel.id);
+  }
+
+  const { error: uErr } = await admin.auth.admin.updateUserById(authUserId!, {
+    app_metadata: appMeta,
+  });
+  if (uErr) return json({ message: "Oturum açılamadı." }, 500);
+
+  // 5) Oturum üret: magiclink token'ı sunucu tarafında doğrulanır ve
+  //    GoTrue gerçek bir oturum (access + refresh token) döndürür.
+  const { data: link, error: gErr } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+  if (gErr || !link?.properties?.hashed_token) {
+    return json({ message: "Oturum açılamadı." }, 500);
+  }
+
+  const verifyRes = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: anonKey },
+    body: JSON.stringify({ type: "magiclink", token_hash: link.properties.hashed_token }),
+  });
+  if (!verifyRes.ok) return json({ message: "Oturum açılamadı." }, 500);
+  const session = await verifyRes.json();
+
+  // Eski login.php cevabıyla uyumlu + Supabase oturumu
   return json({
     message: "Giriş başarılı.",
-    access_token: token,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token ?? null,
     token_type: "bearer",
-    expires_in: TOKEN_TTL_SN,
+    expires_in: session.expires_in,
     kullanici: { ad_soyad: personel.ad_soyad, rol: personel.rol },
     firma: { ad: firma.ad, logo: firma.logo, tema_rengi: firma.hex_color },
   });
