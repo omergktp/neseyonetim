@@ -8,7 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/splash_screen.dart';
 import 'services/sync_service.dart';
 import 'services/fcm_service.dart';
-import 'services/api_service.dart';
+import 'services/supabase_config.dart';
 import 'theme/app_theme.dart';
 import 'utils/ui_utils.dart';
 
@@ -18,8 +18,8 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<Scaffol
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Kayıtlı sunucu IP'sini yükle (giriş ekranından değiştirilebilir; GEÇİCİ çözüm)
-  await ApiService.initBaseUrl();
+  // Supabase istemcisini başlat (özel JWT accessToken ile taşınır).
+  await SupabaseConfig.init();
 
   // Firebase'i başlat ve FCM'i kur (bildirim izni + token kaydı + ön plan bildirimleri)
   await Firebase.initializeApp();

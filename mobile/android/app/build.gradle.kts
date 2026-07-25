@@ -34,6 +34,12 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // İnternetsiz/pilot yapılarda Crashlytics eşleme (mapping) dosyasının
+            // Firebase'e yüklenmesini kapatır; aksi halde build son adımda ağ hatası verir.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 }

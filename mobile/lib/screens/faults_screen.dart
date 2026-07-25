@@ -192,7 +192,8 @@ class _FaultDetailScreenState extends State<FaultDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final a = widget.fault;
-    final fotoUrl = (a['fotograf_url'] != null && a['fotograf_url'] != '') ? ApiService.fileUrl(a['fotograf_url']) : null;
+    // fotograf_url getFaults() içinde imzalı URL'e çözülmüştür.
+    final fotoUrl = (a['fotograf_url'] != null && a['fotograf_url'] != '') ? a['fotograf_url'] as String : null;
     final arizaId = int.tryParse(a['id'].toString()) ?? 0;
 
     return Scaffold(

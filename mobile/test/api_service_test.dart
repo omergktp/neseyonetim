@@ -49,43 +49,20 @@ void main() {
     });
   });
 
-  group('setServerIp temizleme', () {
-    test('şema ve yol atılır, host:port kalır', () async {
-      SharedPreferences.setMockInitialValues({});
-      await ApiService.setServerIp('http://192.168.1.5:8080/neseyonetim/backend');
-      expect(ApiService.serverIp, '192.168.1.5:8080');
-      expect(ApiService.baseUrl, 'http://192.168.1.5:8080/neseyonetim/backend/api');
-    });
-
-    test('https şeması da atılır', () async {
-      SharedPreferences.setMockInitialValues({});
-      await ApiService.setServerIp('https://ornek.com/yol');
-      expect(ApiService.serverIp, 'ornek.com');
-    });
-
-    test('boş girdi mevcut IP yi değiştirmez', () async {
-      SharedPreferences.setMockInitialValues({});
-      await ApiService.setServerIp('10.0.0.7');
-      await ApiService.setServerIp('   ');
-      expect(ApiService.serverIp, '10.0.0.7');
-    });
-  });
-
   group('clearSession', () {
-    test('oturum anahtarlarını siler, tema ve IP korunur', () async {
+    test('oturum anahtarlarını siler, tema korunur', () async {
       SharedPreferences.setMockInitialValues({
         'jwt_token': 'x',
         'rol': 'teknik',
         'ad_soyad': 'Test',
         'theme_color': '#FF0000',
-        'server_ip': '1.2.3.4',
       });
       await ApiService.clearSession();
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('jwt_token'), null);
       expect(prefs.getString('rol'), null);
+      expect(prefs.getString('ad_soyad'), null);
       expect(prefs.getString('theme_color'), '#FF0000');
-      expect(prefs.getString('server_ip'), '1.2.3.4');
     });
   });
 }

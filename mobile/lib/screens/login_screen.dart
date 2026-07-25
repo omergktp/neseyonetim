@@ -20,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final _firmaKoduController = TextEditingController();
   final _telefonController = TextEditingController();
   final _sifreController = TextEditingController();
-  final _ipController = TextEditingController();
   bool _isLoading = false;
   bool _sifreGizli = true;
 
@@ -33,7 +32,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _ipController.text = ApiService.serverIp;
 
     SharedPreferences.getInstance().then((prefs) {
       final hex = prefs.getString('theme_color');
@@ -55,13 +53,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _firmaKoduController.dispose();
     _telefonController.dispose();
     _sifreController.dispose();
-    _ipController.dispose();
     super.dispose();
   }
 
   void _login() async {
     setState(() => _isLoading = true);
-    await ApiService.setServerIp(_ipController.text.trim());
     final result = await ApiService.login(
       _firmaKoduController.text.trim(),
       _telefonController.text.trim(),
@@ -247,13 +243,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                           child: Column(
                             children: [
-                              _buildGlassInput(
-                                controller: _ipController,
-                                label: 'Sunucu (IP)',
-                                icon: Icons.dns_rounded,
-                                type: TextInputType.url,
-                              ),
-                              const SizedBox(height: 16),
                               _buildGlassInput(
                                 controller: _firmaKoduController,
                                 label: 'Firma Kodu',

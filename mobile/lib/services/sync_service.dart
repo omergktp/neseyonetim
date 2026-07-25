@@ -31,6 +31,14 @@ class SyncService {
   /// test sahte bir kontrol enjekte eder. Üretimde daima hasInternet'tir.
   static Future<bool> Function() internetKontrol = hasInternet;
 
+  /// Test dikişleri: birim testte gerçek Supabase istemcisi çalışmaz;
+  /// test 'ok' | 'rejected' | 'retry' döndüren sahteler enjekte eder.
+  /// Üretimde daima ApiService'e gider.
+  static Future<String> Function(int isEmriId, double enlem, double boylam, String foto)
+      gorevGonder = ApiService.saveTask;
+  static Future<String> Function(String endpoint, Map<String, dynamic> body) istekGonder =
+      ApiService.postQueued;
+
   /// Uygulama açılışında çağrılır. Bağlantı değişimlerini dinlemeye başlar
   /// ve açılışta bekleyen kuyruğu bir kez göndermeyi dener.
   static void startListening() {
@@ -70,7 +78,7 @@ class SyncService {
         final double boylam = (item['boylam'] as num).toDouble();
         final String foto = item['fotograf_base64'] as String;
 
-        final sonuc = await ApiService.saveTask(isEmriId, enlem, boylam, foto);
+        final sonuc = await gorevGonder(isEmriId, enlem, boylam, foto);
         if (sonuc == 'retry') break;
         await OfflineQueue.removeFromQueue(item['id'] as int);
         if (sonuc == 'ok') gonderilen++;
@@ -80,7 +88,7 @@ class SyncService {
       final requests = await OfflineQueue.getRequests();
       for (final req in requests) {
         final body = jsonDecode(req['body'] as String) as Map<String, dynamic>;
-        final sonuc = await ApiService.postQueued(req['endpoint'] as String, body);
+        final sonuc = await istekGonder(req['endpoint'] as String, body);
         if (sonuc == 'retry') break;
         await OfflineQueue.removeRequest(req['id'] as int);
         if (sonuc == 'ok') gonderilen++;

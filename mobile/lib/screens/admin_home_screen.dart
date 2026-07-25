@@ -118,7 +118,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             InteractiveViewer(
               child: Image.network(
-                ApiService.fileUrl(relativePath),
+                relativePath,
                 fit: BoxFit.contain,
                 errorBuilder: (c, e, s) => const Padding(
                   padding: EdgeInsets.all(30),

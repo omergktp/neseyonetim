@@ -1,62 +1,57 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'supabase_config.dart';
+
+/// Supabase-native veri katmanı.
+///
+/// Metod imzaları ve dönüş biçimleri PHP dönemiyle AYNI tutulmuştur; böylece
+/// ekran kodları değişmeden çalışır. Fark yalnızca içeride: HTTP+PHP yerine
+/// Supabase (Auth Edge Function + PostgREST view + RPC + Storage).
+///
+/// Fotoğraflar: RPC'ye base64 gönderilmez; önce Storage'a yüklenir ve RPC'ye
+/// "bucket/obje_yolu" biçiminde PATH geçilir. Gösterimde liste metodları
+/// kısa ömürlü imzalı URL üretip ilgili alanı onunla değiştirir.
 class ApiService {
-  // Varsayılan sunucu IP'si (LAN). GEÇİCİ: canlıya geçene kadar giriş ekranından
-  // değiştirilebilir ve cihaza kaydedilir; böylece ağ (ev/ofis) değişince kod
-  // düzenleyip yeniden derlemeye gerek kalmaz.
-  // Android Emülatör için: 10.0.2.2
-  static const String _defaultServerIp = '192.168.1.116';
-  static const String _prefServerIpKey = 'server_ip';
-  static String _serverIp = _defaultServerIp;
+  static SupabaseClient get _sb => SupabaseConfig.client;
 
-  // TEK KAYNAK: Tüm API çağrıları bu adresi kullanır (kayıtlı IP'den türetilir).
-  static String get baseUrl => 'http://$_serverIp/neseyonetim/backend/api';
+  // ---- Bucket'lar ----
+  static const String _bucketIsEmri = 'is-emri-fotograf';
+  static const String _bucketAriza = 'ariza-fotograf';
+  static const String _bucketMasraf = 'masraf-fis';
 
-  // Giriş ekranında göstermek için mevcut sunucu IP'si.
-  static String get serverIp => _serverIp;
-
-  // Uygulama açılışında kayıtlı IP'yi yükler (varsa). main()'de çağrılır.
-  static Future<void> initBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final kayitli = prefs.getString(_prefServerIpKey);
-    if (kayitli != null && kayitli.trim().isNotEmpty) {
-      _serverIp = kayitli.trim();
-    }
-  }
-
-  // Kullanıcının girdiği sunucu adresini temizleyip kaydeder.
-  // "http://192.168.1.5/foo" gibi girişlerden yalnızca host(:port) kısmını alır.
-  static Future<void> setServerIp(String girdi) async {
-    var ip = girdi.trim();
-    if (ip.isEmpty) return;
-    ip = ip.replaceAll(RegExp(r'^https?://'), ''); // şema varsa at
-    ip = ip.replaceAll(RegExp(r'/.*$'), '');        // yol varsa at (host[:port] kalır)
-    if (ip.isEmpty) return;
-    _serverIp = ip;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefServerIpKey, ip);
-  }
-
-  // Uygulamanın yürürlükteki sürümü. pubspec.yaml'daki `version` ile aynı tutulmalı.
-  // Splash ekranı bunu sunucudaki MIN_APP_VERSION ile karşılaştırır.
   static const String appVersion = '1.0.0';
 
-  // Backend kökü (api klasörü olmadan) — yüklenen dosyalara erişim için.
-  static String get _root => baseUrl.endsWith('/api') ? baseUrl.substring(0, baseUrl.length - 4) : baseUrl;
+  // -------- Oturum / token --------
 
-  // DB'de saklı göreli dosya yolundan (örn. uploads/faults/x.jpg) tam URL üretir.
-  static String fileUrl(String relativePath) => '$_root/$relativePath';
-
-  // Kayıtlı JWT token'ı döndürür (yoksa null)
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('jwt_token');
   }
 
-  // Kayıtlı token'ın süresi (exp) geçerli mi? Sunucuya sormadan yerelde bakar;
-  // böylece süresi dolmuş token'la Home'a düşüp 401 hatası yaşanmaz (offline'da da çalışır).
+  /// JWT payload'ından bir claim okur (firma_id / personel_id / rol).
+  static Future<String?> _claim(String key) async {
+    final token = await _getToken();
+    if (token == null) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      final v = payload[key];
+      return v?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<int?> _firmaId() async => int.tryParse(await _claim('firma_id') ?? '');
+  static Future<int?> _personelId() async => int.tryParse(await _claim('personel_id') ?? '');
+
+  /// Kayıtlı token'ın süresi (exp) hâlâ geçerli mi? (offline'da da çalışır)
   static Future<bool> isTokenValid() async {
     final token = await _getToken();
     if (token == null) return false;
@@ -66,14 +61,12 @@ class ApiService {
       final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
       final exp = payload['exp'];
       if (exp is! int) return false;
-      // 60 sn tolerans: sınırdaki token'ı geçerli sayma (saat sapmasına karşı).
       return DateTime.now().millisecondsSinceEpoch ~/ 1000 < exp - 60;
     } catch (_) {
       return false;
     }
   }
 
-  // Oturum bilgilerini temizler (tema rengi ve sunucu IP'si korunur).
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
@@ -81,320 +74,371 @@ class ApiService {
     await prefs.remove('ad_soyad');
   }
 
-  // Authorization başlığı içeren standart header'ları üretir
-  static Future<Map<String, String>> _authHeaders() async {
-    final token = await _getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  // Giriş Yap
-  static Future<Map<String, dynamic>> login(String firmaKodu, String telefon, String sifre) async {
-    final url = Uri.parse('$baseUrl/login.php');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'firma_kodu': firmaKodu,
-          'telefon': telefon,
-          'sifre': sifre,
-        }),
-      );
-
-      dynamic data;
-      try {
-        data = jsonDecode(response.body);
-      } catch (e) {
-        if (response.statusCode == 404) {
-          return {'success': false, 'message': 'Sunucu bulunamadı (404). Lütfen Sunucu (IP) adresini kontrol edin. (Örn: XAMPP htdocs dizini veya Port)'};
-        }
-        return {'success': false, 'message': 'Sunucudan geçersiz yanıt (HTML) alındı. IP adresi yanlış olabilir.'};
-      }
-
-      if (response.statusCode == 200) {
-        // Beklenmeyen yanıt (token yok/bozuk) çökmesin diye doğrula.
-        if (data is! Map || data['token'] is! String) {
-          return {'success': false, 'message': 'Sunucudan beklenmeyen yanıt alındı (token eksik).'};
-        }
-        // Token ve Tema rengini kaydet
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', data['token']);
-
-        // Rol ve ad (arıza/masraf gibi role bağlı ekranlar için)
-        final rol = data['kullanici']?['rol'];
-        if (rol != null) await prefs.setString('rol', rol);
-        final adSoyad = data['kullanici']?['ad_soyad'];
-        if (adSoyad != null) await prefs.setString('ad_soyad', adSoyad);
-
-        final hexColor = data['firma']?['tema_rengi'];
-        if (hexColor != null) {
-          await prefs.setString('theme_color', hexColor);
-        }
-
-        return {'success': true, 'data': data};
-      } else {
-        return {'success': false, 'message': data['message'] ?? 'Giriş başarısız.'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Sunucu bağlantı hatası: $e'};
-    }
-  }
-
-  // Sürüm kontrolü (splash). Kimlik doğrulama gerektirmez.
-  // Dönüş: { ok: bool, guncellemeZorunlu: bool, storeUrl: String, mesaj: String }
-  // ok=false ise (internet/sunucu yok) çağıran taraf engellememeli; akışa devam etmeli (offline-first).
-  static Future<Map<String, dynamic>> checkVersion() async {
-    final url = Uri.parse('$baseUrl/version.php?v=$appVersion');
-    try {
-      final response = await http
-          .get(url)
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return {
-          'ok': true,
-          'guncellemeZorunlu': data['guncelleme_zorunlu'] == true,
-          'storeUrl': data['store_url'] ?? '',
-          'mesaj': data['mesaj'] ?? '',
-        };
-      }
-      return {'ok': false};
-    } catch (e) {
-      // Ağ/sunucu hatası: kullanıcıyı engelleme.
-      return {'ok': false};
-    }
-  }
-
-  // Görevleri Getir
-  static Future<Map<String, dynamic>> getTasks() async {
-    final url = Uri.parse('$baseUrl/get_tasks.php');
-    final token = await _getToken();
-    if (token == null) return {'success': false, 'message': 'Oturum süresi dolmuş.'};
-
-    try {
-      final response = await http.get(url, headers: await _authHeaders());
-
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'tasks': data['data'],
-          'bugunTamamlanan': data['bugun_tamamlanan'] ?? 0,
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'],
-          // 401: token geçersiz/süresi dolmuş → çağıran taraf login'e yönlendirir.
-          'sessionExpired': response.statusCode == 401,
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Bağlantı hatası: $e'};
-    }
-  }
-
-  // Görevi tamamla (kapanış: konum + filigranlı fotoğraf).
-  // Dönüş: 'ok' (kaydedildi), 'rejected' (sunucu kalıcı olarak reddetti; tekrar denemek
-  // anlamsız — ör. görev zaten kapatılmış), 'retry' (ağ/oturum/sunucu geçici hatası).
-  // Bu ayrım offline kuyruğun tek bir "ölü" kayıt yüzünden sonsuza dek tıkanmasını önler.
-  static Future<String> saveTask(int isEmriId, double lat, double lng, String base64Image) async {
-    return postQueued('save_task.php', {
-      'is_emri_id': isEmriId,
-      'tamamlanma_enlem': lat,
-      'tamamlanma_boylam': lng,
-      'kapanis_fotograf_url': base64Image,
-    });
-  }
-
-  // Kuyruklanabilir genel POST. Dönüş: 'ok' | 'rejected' | 'retry' (saveTask ile aynı sözleşme).
-  static Future<String> postQueued(String endpoint, Map<String, dynamic> body) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/$endpoint'),
-        headers: await _authHeaders(),
-        body: jsonEncode(body),
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) return 'ok';
-      // 401: oturum sorunu — kullanıcı tekrar giriş yapınca gönderilebilir.
-      if (response.statusCode == 401) return 'retry';
-      if (response.statusCode >= 400 && response.statusCode < 500) return 'rejected';
-      return 'retry';
-    } catch (_) {
-      return 'retry';
-    }
-  }
-
-  // Kayıtlı kullanıcı rolünü döndürür (yonetici/temizlik/teknik) — yoksa null.
   static Future<String?> getRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('rol');
   }
 
-  // Firmadaki tesisleri getirir (arıza bildirimi için). Hata durumunda null döner
-  // (boş liste ile karışmasın; çağıran taraf kullanıcıya hata gösterebilsin).
-  static Future<List<dynamic>?> getSites() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/get_sites.php'), headers: await _authHeaders());
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body)['data'] ?? [];
-      }
-    } catch (_) {}
-    return null;
+  // -------- Storage yardımcıları --------
+
+  static String _rndName() {
+    final r = Random();
+    final s = List.generate(8, (_) => r.nextInt(16).toRadixString(16)).join();
+    return '${DateTime.now().microsecondsSinceEpoch}_$s.jpg';
   }
 
-  // FCM cihaz token'ını backend'e kaydeder (giriş yapılmış olmalı).
-  static Future<void> saveFcmToken(String fcmToken) async {
-    final t = await _getToken();
-    if (t == null) return; // Oturum yoksa kaydetme
+  /// base64 görseli Storage'a yükler; DB'de saklanacak "bucket/obje_yolu" döner.
+  /// Obje yolu firma_id ile başlar (Storage RLS izolasyonu).
+  static Future<String> _uploadBase64(String base64Image, String bucket, String subdir) async {
+    final firma = await _firmaId();
+    if (firma == null) throw const AuthException('Oturum bulunamadı.');
+    final raw = base64Image.contains(',') ? base64Image.split(',').last : base64Image;
+    final bytes = base64Decode(raw);
+    final objectPath = '$firma/$subdir/${_rndName()}';
+    await _sb.storage.from(bucket).uploadBinary(
+          objectPath,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+        );
+    return '$bucket/$objectPath';
+  }
+
+  /// "bucket/obje_yolu" değerinden kısa ömürlü imzalı görüntüleme URL'i üretir.
+  static Future<String?> _signed(String? stored) async {
+    if (stored == null || stored.isEmpty) return null;
+    final i = stored.indexOf('/');
+    if (i <= 0) return null;
     try {
-      await http.post(
-        Uri.parse('$baseUrl/save_fcm_token.php'),
-        headers: await _authHeaders(),
-        body: jsonEncode({'fcm_token': fcmToken}),
-      );
+      return await _sb.storage.from(stored.substring(0, i)).createSignedUrl(stored.substring(i + 1), 3600);
     } catch (_) {
-      // Sessizce yut
+      return null;
     }
   }
 
-  // Çıkışta: bu personelin FCM token'ını backend'den siler.
-  static Future<void> clearFcmToken() async {
-    final t = await _getToken();
-    if (t == null) return;
+  // -------- Hata -> kuyruk sözleşmesi ('ok' | 'rejected' | 'retry') --------
+
+  /// RPC'yi çalıştırır; kuyruk sözleşmesine göre sonuç döndürür.
+  static Future<String> _rpcQueued(String fn, Map<String, dynamic> params) async {
     try {
-      await http.post(
-        Uri.parse('$baseUrl/clear_fcm_token.php'),
-        headers: await _authHeaders(),
-      );
+      await _sb.rpc(fn, params: params);
+      return 'ok';
+    } on PostgrestException catch (_) {
+      // İş kuralı reddi (PTxxx / 4xx) — tekrar denemek anlamsız.
+      return 'rejected';
+    } on AuthException catch (_) {
+      return 'retry'; // oturum sorunu — yeniden giriş sonrası denenebilir
+    } on StorageException catch (_) {
+      return 'retry';
+    } on SocketException catch (_) {
+      return 'retry';
+    } on TimeoutException catch (_) {
+      return 'retry';
     } catch (_) {
-      // Sessizce yut
+      return 'retry';
     }
   }
 
-  // Görevi başlat (durum: bekliyor -> devam_ediyor). yontem: 'qr' veya 'konum'.
-  // 'konum' yönteminde sunucu da mesafeyi doğrular; bu yüzden koordinatlar gönderilir.
-  static Future<Map<String, dynamic>> startTask(int isEmriId, String yontem,
-      {String? qrDeger, double? enlem, double? boylam}) async {
+  /// RPC'yi çalıştırır; {success, message} döndürür (senkron ekranlar için).
+  static Future<Map<String, dynamic>> _rpcResult(String fn, Map<String, dynamic> params,
+      {String basari = 'İşlem tamamlandı.'}) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/start_task.php'),
-        headers: await _authHeaders(),
-        body: jsonEncode({
-          'is_emri_id': isEmriId,
-          'yontem': yontem,
-          if (qrDeger != null) 'qr_deger': qrDeger,
-          if (enlem != null) 'enlem': enlem,
-          if (boylam != null) 'boylam': boylam,
-        }),
-      );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message'] ?? 'Görev başlatıldı.'};
-      }
-      return {'success': false, 'message': data['message'] ?? 'Görev başlatılamadı.'};
+      final res = await _sb.rpc(fn, params: params);
+      final msg = (res is Map && res['message'] != null) ? res['message'].toString() : basari;
+      return {'success': true, 'message': msg, if (res is Map) 'data': res};
+    } on PostgrestException catch (e) {
+      return {'success': false, 'message': e.message};
     } catch (e) {
       return {'success': false, 'message': 'Bağlantı hatası: $e'};
     }
   }
 
-  // Checklist maddesini (alt görev) yapıldı/yapılmadı olarak işaretle.
-  // Başarılıysa true döner; ağ/sunucu hatasında false (çağıran taraf eski duruma döner).
+  // ======================= GİRİŞ =======================
+
+  static Future<Map<String, dynamic>> login(String firmaKodu, String telefon, String sifre) async {
+    try {
+      final res = await _sb.functions.invoke('login', body: {
+        'firma_kodu': firmaKodu,
+        'telefon': telefon,
+        'sifre': sifre,
+      });
+      final data = res.data;
+      if (res.status == 200 && data is Map && data['access_token'] is String) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('jwt_token', data['access_token']);
+        final rol = data['kullanici']?['rol'];
+        if (rol != null) await prefs.setString('rol', rol.toString());
+        final adSoyad = data['kullanici']?['ad_soyad'];
+        if (adSoyad != null) await prefs.setString('ad_soyad', adSoyad.toString());
+        final hexColor = data['firma']?['tema_rengi'];
+        if (hexColor != null) await prefs.setString('theme_color', hexColor.toString());
+        return {'success': true, 'data': data};
+      }
+      final msg = (data is Map ? data['message'] : null) ?? 'Giriş başarısız.';
+      return {'success': false, 'message': msg};
+    } on FunctionException catch (e) {
+      final d = e.details;
+      final msg = (d is Map && d['message'] != null) ? d['message'].toString() : 'Giriş başarısız.';
+      return {'success': false, 'message': msg};
+    } catch (e) {
+      return {'success': false, 'message': 'Sunucu bağlantı hatası: $e'};
+    }
+  }
+
+  /// Sürüm kontrolü. Supabase-native'de zorunlu güncelleme kapısı yok;
+  /// offline-first davranışı korumak için engellemeden geçer.
+  static Future<Map<String, dynamic>> checkVersion() async {
+    return {'ok': false};
+  }
+
+  // ======================= OKUMA =======================
+
+  /// Personelin kendi aktif görevleri (+ checklist + tesis). PHP get_tasks şekli.
+  static Future<Map<String, dynamic>> getTasks() async {
+    if (await _getToken() == null) return {'success': false, 'message': 'Oturum süresi dolmuş.'};
+    try {
+      final rows = await _sb
+          .from('is_emirleri')
+          .select(
+              'id,baslik,aciklama,durum,qr_kod,planlanan_baslangic_tarihi, siteler(ad,adres,enlem,boylam), is_emirleri_alt_gorevler(id,gorev_metni,yapildi_mi)')
+          .inFilter('durum', ['bekliyor', 'devam_ediyor']).order('planlanan_baslangic_tarihi', ascending: true);
+
+      final tasks = (rows as List).map((r) {
+        final s = r['siteler'];
+        final alt = (r['is_emirleri_alt_gorevler'] as List? ?? [])
+            .map((a) => {
+                  'id': a['id'],
+                  'gorev_metni': a['gorev_metni'],
+                  'yapildi_mi': (a['yapildi_mi'] == true) ? 1 : 0, // ekranlar 0/1 bekliyor
+                })
+            .toList();
+        return {
+          'id': r['id'],
+          'baslik': r['baslik'],
+          'aciklama': r['aciklama'],
+          'durum': r['durum'],
+          'qr_kod': r['qr_kod'],
+          'planlanan_baslangic_tarihi': r['planlanan_baslangic_tarihi'],
+          'site_adi': s?['ad'],
+          'site_adresi': s?['adres'],
+          'enlem': s?['enlem'],
+          'boylam': s?['boylam'],
+          'alt_gorevler': alt,
+        };
+      }).toList();
+
+      // Bugün tamamlanan (yerel gün başlangıcı)
+      final now = DateTime.now();
+      final gunBas = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+      final tamam = await _sb
+          .from('is_emirleri')
+          .select('id')
+          .eq('durum', 'tamamlandi')
+          .gte('tamamlanma_tarihi', gunBas);
+
+      return {'success': true, 'tasks': tasks, 'bugunTamamlanan': (tamam as List).length};
+    } on PostgrestException catch (e) {
+      return {'success': false, 'message': e.message, 'sessionExpired': false};
+    } on AuthException catch (e) {
+      return {'success': false, 'message': e.message, 'sessionExpired': true};
+    } catch (e) {
+      return {'success': false, 'message': 'Bağlantı hatası: $e'};
+    }
+  }
+
+  /// Firmadaki aktif tesisler (arıza bildirimi seçim listesi). Hata -> null.
+  static Future<List<dynamic>?> getSites() async {
+    try {
+      final rows = await _sb
+          .from('siteler')
+          .select('id,ad,adres,enlem,boylam,qr_kod,aktif')
+          .eq('aktif', true)
+          .order('ad', ascending: true);
+      return rows as List;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Teknik personele atanmış açık arızalar. Hata -> null.
+  static Future<List<dynamic>?> getFaults() async {
+    try {
+      final pid = await _personelId();
+      if (pid == null) return null;
+      final rows = await _sb
+          .from('v_ariza')
+          .select('*')
+          .eq('teknik_personel_id', pid)
+          .inFilter('durum', ['acik', 'bekliyor', 'dis_destek']).order('olusturma_tarihi', ascending: false);
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      for (final a in list) {
+        a['fotograf_url'] = await _signed(a['fotograf_url'] as String?);
+        a['cozum_fotograf_url'] = await _signed(a['cozum_fotograf_url'] as String?);
+      }
+      return list;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ======================= YAZMA (mobil) =======================
+
+  /// Görevi tamamla. Fotoğraf Storage'a yüklenir; sonra save_task RPC.
+  static Future<String> saveTask(int isEmriId, double lat, double lng, String base64Image) async {
+    String? path;
+    try {
+      if (base64Image.isNotEmpty) path = await _uploadBase64(base64Image, _bucketIsEmri, 'tasks');
+    } on SocketException catch (_) {
+      return 'retry';
+    } on StorageException catch (_) {
+      return 'retry';
+    } catch (_) {
+      return 'retry';
+    }
+    return _rpcQueued('save_task', {
+      'p_is_emri_id': isEmriId,
+      'p_enlem': lat,
+      'p_boylam': lng,
+      'p_kapanis_fotograf_path': path,
+    });
+  }
+
+  /// Kuyruklanabilir POST (offline replay). Endpoint adına göre RPC'ye eşlenir;
+  /// gömülü base64 fotoğraf önce Storage'a yüklenir. Sözleşme: 'ok'|'rejected'|'retry'.
+  static Future<String> postQueued(String endpoint, Map<String, dynamic> body) async {
+    try {
+      switch (endpoint) {
+        case 'report_fault.php':
+          String? foto;
+          if (body['fotograf_url'] != null) {
+            foto = await _uploadBase64(body['fotograf_url'], _bucketAriza, 'faults');
+          }
+          return _rpcQueued('report_fault', {
+            'p_site_id': body['site_id'],
+            'p_baslik': body['baslik'],
+            'p_aciklama': body['aciklama'],
+            'p_fotograf_path': foto,
+          });
+        case 'add_expense.php':
+          final foto = await _uploadBase64(body['fis_fotograf_url'], _bucketMasraf, 'expenses');
+          return _rpcQueued('add_expense', {
+            'p_is_emri_id': body['is_emri_id'],
+            'p_ariza_id': body['ariza_id'],
+            'p_kalem_adi': body['kalem_adi'],
+            'p_tutar': num.tryParse(body['tutar'].toString()),
+            'p_fis_fotograf_path': foto,
+          });
+        default:
+          return 'rejected';
+      }
+    } on SocketException catch (_) {
+      return 'retry';
+    } on StorageException catch (_) {
+      return 'retry';
+    } on TimeoutException catch (_) {
+      return 'retry';
+    } catch (_) {
+      return 'retry';
+    }
+  }
+
+  /// Görevi başlat (QR / konum). start_task RPC (konum doğrulaması sunucuda).
+  static Future<Map<String, dynamic>> startTask(int isEmriId, String yontem,
+      {String? qrDeger, double? enlem, double? boylam}) async {
+    return _rpcResult('start_task', {
+      'p_is_emri_id': isEmriId,
+      'p_yontem': yontem,
+      'p_qr_deger': qrDeger,
+      'p_enlem': enlem,
+      'p_boylam': boylam,
+    }, basari: 'Görev başlatıldı.');
+  }
+
+  /// Checklist maddesini işaretle. Başarı -> true.
   static Future<bool> updateSubtask(int altGorevId, bool yapildi) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/update_subtask.php'),
-        headers: await _authHeaders(),
-        body: jsonEncode({'alt_gorev_id': altGorevId, 'yapildi': yapildi}),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
+      await _sb.rpc('update_subtask', params: {'p_alt_gorev_id': altGorevId, 'p_yapildi': yapildi});
+      return true;
+    } catch (_) {
       return false;
     }
   }
 
-  // Teknik personele atanmış açık arızaları getirir. Hata durumunda null döner
-  // (boş liste = gerçekten arıza yok; null = yüklenemedi).
-  static Future<List<dynamic>?> getFaults() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/get_faults.php'), headers: await _authHeaders());
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body)['data'] ?? [];
+  /// Arıza durumunu güncelle (teknik). 'cozuldu' için çözüm fotoğrafı zorunlu.
+  static Future<Map<String, dynamic>> updateFault(int arizaId, String durum,
+      {String? not, String? cozumFotograf}) async {
+    String? path;
+    if (cozumFotograf != null && cozumFotograf.isNotEmpty) {
+      try {
+        path = await _uploadBase64(cozumFotograf, _bucketAriza, 'resolutions');
+      } catch (e) {
+        return {'success': false, 'message': 'Çözüm fotoğrafı yüklenemedi: $e'};
       }
-    } catch (_) {}
-    return null;
+    }
+    return _rpcResult('update_fault', {
+      'p_ariza_id': arizaId,
+      'p_durum': durum,
+      'p_not': (not != null && not.isNotEmpty) ? not : null,
+      'p_cozum_fotograf_path': path,
+    }, basari: 'Arıza güncellendi.');
   }
 
-  // ---- Yönetici (admin) uçları: mobil yönetici görünümü için ----
-  // Bu uçlar backend'de require_admin() ile korunur; yalnızca 'yonetici' rolü erişebilir.
+  // -------- FCM token --------
 
-  /// Panel özeti (istatistik + tesis özeti + son işler). Hata durumunda null.
+  static Future<void> saveFcmToken(String fcmToken) async {
+    if (await _getToken() == null) return;
+    try {
+      await _sb.rpc('set_fcm_token', params: {'p_fcm_token': fcmToken});
+    } catch (_) {}
+  }
+
+  static Future<void> clearFcmToken() async {
+    if (await _getToken() == null) return;
+    try {
+      await _sb.rpc('clear_fcm_token');
+    } catch (_) {}
+  }
+
+  // ======================= YÖNETİCİ (admin) =======================
+
   static Future<Map<String, dynamic>?> getAdminDashboard() async {
     try {
-      final r = await http.get(Uri.parse('$baseUrl/admin/dashboard.php'), headers: await _authHeaders());
-      if (r.statusCode == 200) return jsonDecode(r.body) as Map<String, dynamic>;
-    } catch (_) {}
-    return null;
-  }
-
-  /// Masraf listesi (opsiyonel durum filtresi). Hata durumunda null.
-  static Future<List<dynamic>?> getAdminMasraflar({String? durum}) async {
-    try {
-      final url = '$baseUrl/admin/masraflar.php${durum != null ? '?durum=$durum' : ''}';
-      final r = await http.get(Uri.parse(url), headers: await _authHeaders());
-      if (r.statusCode == 200) return jsonDecode(r.body)['data'] ?? [];
-    } catch (_) {}
-    return null;
-  }
-
-  /// Masraf onayla/reddet. islem: 'onayla' | 'reddet'.
-  static Future<Map<String, dynamic>> adminMasrafIslem(int id, String islem) async {
-    try {
-      final r = await http.post(
-        Uri.parse('$baseUrl/admin/masraflar.php'),
-        headers: await _authHeaders(),
-        body: jsonEncode({'id': id, 'islem': islem}),
-      );
-      final data = jsonDecode(r.body);
-      return {'success': r.statusCode == 200, 'message': data['message'] ?? 'İşlem tamamlandı.'};
-    } catch (e) {
-      return {'success': false, 'message': 'Bağlantı hatası: $e'};
+      final res = await _sb.rpc('admin_dashboard', params: {'p_site_id': null});
+      return res is Map ? Map<String, dynamic>.from(res) : null;
+    } catch (_) {
+      return null;
     }
   }
 
-  /// Firma arıza listesi. Hata durumunda null.
-  static Future<List<dynamic>?> getAdminArizalar() async {
+  static Future<List<dynamic>?> getAdminMasraflar({String? durum}) async {
     try {
-      final r = await http.get(Uri.parse('$baseUrl/admin/arizalar.php'), headers: await _authHeaders());
-      if (r.statusCode == 200) return jsonDecode(r.body)['data'] ?? [];
-    } catch (_) {}
-    return null;
+      var q = _sb.from('v_masraf').select('*');
+      if (durum != null) q = q.eq('durum', durum);
+      final rows = await q.order('olusturma_tarihi', ascending: false);
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      for (final m in list) {
+        m['fis_fatura_fotograf'] = await _signed(m['fis_fatura_fotograf'] as String?);
+      }
+      return list;
+    } catch (_) {
+      return null;
+    }
   }
 
-  // Arıza durumunu güncelle. durum: 'cozuldu' | 'bekliyor' | 'dis_destek'.
-  // 'cozuldu' için cozumFotograf (base64) zorunludur.
-  static Future<Map<String, dynamic>> updateFault(int arizaId, String durum, {String? not, String? cozumFotograf}) async {
+  static Future<Map<String, dynamic>> adminMasrafIslem(int id, String islem) async {
+    return _rpcResult('admin_masraf_karar', {'p_id': id, 'p_karar': islem}, basari: 'İşlem tamamlandı.');
+  }
+
+  static Future<List<dynamic>?> getAdminArizalar() async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/update_fault.php'),
-        headers: await _authHeaders(),
-        body: jsonEncode({
-          'ariza_id': arizaId,
-          'durum': durum,
-          if (not != null && not.isNotEmpty) 'not': not,
-          if (cozumFotograf != null) 'cozum_fotograf': cozumFotograf,
-        }),
-      );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message'] ?? 'Arıza güncellendi.'};
+      final rows = await _sb.from('v_ariza').select('*').order('olusturma_tarihi', ascending: false);
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      for (final a in list) {
+        a['fotograf_url'] = await _signed(a['fotograf_url'] as String?);
+        a['cozum_fotograf_url'] = await _signed(a['cozum_fotograf_url'] as String?);
       }
-      return {'success': false, 'message': data['message'] ?? 'İşlem başarısız.'};
-    } catch (e) {
-      return {'success': false, 'message': 'Bağlantı hatası: $e'};
+      return list;
+    } catch (_) {
+      return null;
     }
   }
 }
