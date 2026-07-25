@@ -589,20 +589,9 @@
         </div>
     </div>
 
+    <!-- apiFetch / fotoUrl: eski PHP uçlarını Supabase'e eşleyen katman -->
+    <script src="api-supabase.js"></script>
     <script>
-        const API = '../backend/api';
-        const BACKEND = '../backend';
-        const token = localStorage.getItem('glow_token');
-        if (!token) { window.location.href = 'index.html'; }
-
-        async function apiFetch(path, options = {}) {
-            const res = await fetch(`${API}/${path}`, {
-                ...options,
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(options.headers || {}) },
-            });
-            if (res.status === 401 || res.status === 403) { localStorage.clear(); window.location.href = 'index.html'; throw new Error('Yetkisiz'); }
-            return res;
-        }
 
         // ============ TEMA (açık / koyu) ============
         function _temaIkonGuncelle() {
@@ -1198,20 +1187,20 @@
             if (masraflar.length) {
                 masrafHtml = `<div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Bu Arızaya Girilen Masraflar</p>` +
                     masraflar.map(m => `<div class="flex justify-between items-center py-2 border-b border-slate-100 text-sm">
-                        <span>${esc(m.kalem_adi)} <span class="text-slate-400">(${esc(m.personel_adi||'-')})</span>${m.fis_fatura_fotograf ? ` <a href="${esc(BACKEND + '/' + m.fis_fatura_fotograf)}" target="_blank" class="text-blue-600 ml-1"><i class="fa-solid fa-image"></i> Fiş</a>` : ''}</span>
+                        <span>${esc(m.kalem_adi)} <span class="text-slate-400">(${esc(m.personel_adi||'-')})</span>${m.fis_fatura_fotograf ? ` <a href="${esc(fotoUrl(m.fis_fatura_fotograf))}" target="_blank" class="text-blue-600 ml-1"><i class="fa-solid fa-image"></i> Fiş</a>` : ''}</span>
                         <span class="font-medium">${paraTL(m.tutar)} ${durumBadge(m.durum)}</span>
                     </div>`).join('') + `</div>`;
             }
 
             let fotoHtml = '<span class="text-slate-400 italic">Fotoğraf yok</span>';
             if (a.fotograf_url) {
-                const url = esc(`${BACKEND}/${a.fotograf_url}`);
+                const url = esc(fotoUrl(a.fotograf_url));
                 fotoHtml = `<a href="${url}" target="_blank"><img src="${url}" class="rounded-xl border border-slate-200 max-h-64 object-contain"></a>`;
             }
 
             let cozumFotoHtml = '';
             if (a.cozum_fotograf_url) {
-                const curl = esc(`${BACKEND}/${a.cozum_fotograf_url}`);
+                const curl = esc(fotoUrl(a.cozum_fotograf_url));
                 cozumFotoHtml = `<div class="mb-5"><p class="text-xs text-slate-400 uppercase font-semibold mb-2">Çözüm Fotoğrafı</p><a href="${curl}" target="_blank"><img src="${curl}" class="rounded-xl border-2 border-emerald-200 max-h-64 object-contain"></a></div>`;
             }
 
@@ -1303,7 +1292,7 @@
             tbody.innerHTML = liste.map(m => {
                 const ilgili = m.is_emri_baslik || m.ariza_baslik || '-';
                 const fis = m.fis_fatura_fotograf
-                    ? `<a href="${esc(BACKEND + '/' + m.fis_fatura_fotograf)}" target="_blank" class="text-blue-600 hover:underline"><i class="fa-solid fa-image"></i> Gör</a>`
+                    ? `<a href="${esc(fotoUrl(m.fis_fatura_fotograf))}" target="_blank" class="text-blue-600 hover:underline"><i class="fa-solid fa-image"></i> Gör</a>`
                     : '<span class="text-slate-400">-</span>';
                 const islem = (m.durum === 'bekliyor'
                     ? `<button onclick="masrafIslem(${m.id},'onayla')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium mr-1">Onayla</button>
@@ -1449,7 +1438,7 @@
                 // Kapanış fotoğrafı
                 let fotoHtml = '<span class="text-slate-400 italic">Fotoğraf yok</span>';
                 if (r.kapanis_fotograf_url) {
-                    const url = esc(`${BACKEND}/${r.kapanis_fotograf_url}`);
+                    const url = esc(fotoUrl(r.kapanis_fotograf_url));
                     fotoHtml = `<a href="${url}" target="_blank"><img src="${url}" class="rounded-xl border border-slate-200 max-h-72 object-contain"></a>`;
                 }
 

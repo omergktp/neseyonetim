@@ -151,10 +151,9 @@
 
     </div>
 
+    <!-- apiFetch: eski PHP uçlarını Supabase'e eşleyen katman -->
+    <script src="api-supabase.js"></script>
     <script>
-        const API = '../backend/api';
-        const token = localStorage.getItem('glow_token');
-        if (!token) { window.location.href = 'index.html'; }
 
         // Tema (açık/koyu) — dashboard ile aynı tercihi paylaşır
         function _temaIko() {
@@ -168,18 +167,6 @@
             _temaIko();
         }
         _temaIko();
-
-        async function apiFetch(path) {
-            const res = await fetch(`${API}/${path}`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (res.status === 401 || res.status === 403) {
-                localStorage.clear();
-                window.location.href = 'index.html';
-                throw new Error('Yetkisiz');
-            }
-            return res;
-        }
 
         function esc(s) {
             return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

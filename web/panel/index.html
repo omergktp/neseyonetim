@@ -106,15 +106,15 @@
             const sifre = document.getElementById('sifre').value;
 
             try {
-                const response = await fetch('../backend/api/login.php', {
+                const response = await fetch('https://bfkiifbzxwhbviluyzcp.supabase.co/functions/v1/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ firma_kodu: firmaKodu, telefon: telefon, sifre: sifre })
                 });
-                
+
                 const data = await response.json();
-                
-                if (response.ok && data.token) {
+
+                if (response.ok && data.access_token) {
                     // Web paneli sadece yöneticiler içindir
                     if (data.kullanici.rol !== 'yonetici') {
                         document.getElementById('errorMessage').innerText = "Bu panel yalnızca yöneticiler içindir. Saha personeli mobil uygulamayı kullanmalıdır.";
@@ -124,7 +124,7 @@
                         return;
                     }
                     // Token'ı localStorage'a kaydet ve yönlendir
-                    localStorage.setItem('glow_token', data.token);
+                    localStorage.setItem('glow_token', data.access_token);
                     localStorage.setItem('glow_user', JSON.stringify(data.kullanici));
                     window.location.href = "dashboard.html";
                 } else {
