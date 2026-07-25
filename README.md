@@ -25,8 +25,8 @@ PHP dosyalarının yerel sunucunuzda çalışabilmesi için projeyi doğru klas�
 
 1. `neseyonetim` klasörünü (şu an masaüstünüzde bulunan) kopyalayın.
 2. XAMPP kullanıyorsanız `C:\xampp\htdocs\` klasörünün içine, Laragon kullanıyorsanız `C:\laragon\www\` klasörünün içine yapıştırın.
-3. `backend/config.php` dosyasını bir kod editöründe açın. Veritabanı şifreniz varsa `DB_PASS` kısmına yazın. XAMPP için varsayılan şifre boştur (`''`).
-4. Tarayıcınızı açıp `http://localhost/neseyonetim/backend/api/login.php` adresine gitmeyi deneyin. "Eksik bilgi gönderildi" gibi bir JSON hatası görüyorsanız, API'niz sorunsuz çalışıyor demektir.
+3. `web/backend/config.php` dosyasını bir kod editöründe açın. Veritabanı şifreniz varsa `DB_PASS` kısmına yazın. XAMPP için varsayılan şifre boştur (`''`).
+4. Tarayıcınızı açıp `http://localhost/neseyonetim/web/backend/api/login.php` adresine gitmeyi deneyin. "Eksik bilgi gönderildi" gibi bir JSON hatası görüyorsanız, API'niz sorunsuz çalışıyor demektir.
 
 ---
 
@@ -34,7 +34,7 @@ PHP dosyalarının yerel sunucunuzda çalışabilmesi için projeyi doğru klas�
 
 Web paneli saf HTML ve Tailwind CSS kullandığı için doğrudan tarayıcıda çalışabilir.
 
-1. `C:\xampp\htdocs\neseyonetim\frontend\` klasörüne gidin.
+1. `C:\xampp\htdocs\neseyonetim\web\panel\` klasörüne gidin.
 2. `index.html` dosyasına çift tıklayarak tarayıcıda açın. Muazzam giriş (Login) ekranını göreceksiniz.
 3. Formu doldurup "Giriş Yap" butonuna bastığınızda sizi otomatik olarak Yönetici Paneline (`dashboard.html`) yönlendirecektir.
 4. Raporlama modülünü test etmek için `rapor_pdf.html` dosyasına çift tıklayın ve açılan ekranda "Yazdır" butonuna basarak PDF önizlemesini görün.

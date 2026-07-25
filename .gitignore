@@ -1,12 +1,15 @@
 # --- Gizli anahtarlar / yapılandırma (ASLA commit edilmez) ---
-backend/secrets/
-backend/config.php
+web/backend/secrets/
+web/backend/config.php
 *firebase-adminsdk*.json
 fcm-service-account.json
 
 # --- Kullanıcı verisi ---
-backend/uploads/
+web/backend/uploads/
 db/backups/
+
+# --- Vercel ---
+.vercel/
 
 # --- Flutter / Android build çıktıları ---
 mobile/build/

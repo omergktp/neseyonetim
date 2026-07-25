@@ -1,0 +1,10 @@
+# Vercel yalnizca statik web icerigini (landing + panel) yayinlar.
+# PHP kaynaklari ve uygulama kodu yuklenmez.
+mobile/
+supabase/
+db/
+scripts/
+web/backend/
+web/index.php
+.github/
+*.md
