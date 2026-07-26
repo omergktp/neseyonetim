@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/supabase_config.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/glowing_blob.dart';
@@ -27,11 +28,22 @@ class _SplashScreenState extends State<SplashScreen> {
   bool _guncellemeZorunlu = false;
   String _mesaj = '';
   String _storeUrl = '';
+  String? _firmaLogoUrl;
 
   @override
   void initState() {
     super.initState();
+    _firmaLogoYukle();
     _bootstrap();
+  }
+
+  // Girişte kaydedilen firma logosu varsa splash markası onunla açılır.
+  Future<void> _firmaLogoYukle() async {
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString('firma_logo_url');
+    if (url != null && url.isNotEmpty && mounted) {
+      setState(() => _firmaLogoUrl = url);
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -48,19 +60,30 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // Sürüm uygun (veya kontrol edilemedi): token geçerliliğine göre yönlendir.
-    // Süresi dolmuş token'la Home'a gitmek 401 + boş ekran yaşatır; login'e döneriz.
-    final tokenGecerli = await ApiService.isTokenValid();
-    if (!tokenGecerli) await ApiService.clearSession();
-
+    // Sürüm uygun (veya kontrol edilemedi): oturum durumuna göre yönlendir.
+    // Token dolmuşsa önce refresh_token ile sessizce yenilemeyi dene; yalnız
+    // yenileme de reddedilirse login'e dön. Sunucuya ulaşılamıyorsa (offline)
+    // oturum düşürülmez — offline-first davranış korunur.
     final prefs = await SharedPreferences.getInstance();
+    var oturumVar = await ApiService.isTokenValid();
+    if (!oturumVar) {
+      final sonuc = await SupabaseConfig.refreshSession();
+      if (sonuc == 'ok') {
+        oturumVar = true;
+      } else if (sonuc == 'network') {
+        oturumVar = (prefs.getString('refresh_token') ?? '').isNotEmpty &&
+            prefs.getString('rol') != null;
+      }
+      if (!oturumVar) await ApiService.clearSession();
+    }
+
     final themeColor = prefs.getString('theme_color') ?? widget.themeColorHex;
     final rol = prefs.getString('rol');
 
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => !tokenGecerli
+        builder: (_) => !oturumVar
             ? LoginScreen()
             // Yönetici cepten kontrol ekranına, saha personeli görev listesine gider.
             : (rol == 'yonetici'
@@ -104,7 +127,7 @@ class _SplashScreenState extends State<SplashScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const BrandLogo(size: 84),
+          BrandLogo(size: 84, logoUrl: _firmaLogoUrl),
           const SizedBox(height: 22),
           const Text('GLOW SAHA',
               style: TextStyle(
@@ -133,7 +156,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const BrandLogo(size: 72),
+            BrandLogo(size: 72, logoUrl: _firmaLogoUrl),
             const SizedBox(height: 28),
             Container(
               padding: const EdgeInsets.all(24),

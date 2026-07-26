@@ -13,13 +13,45 @@
 const SUPABASE_URL = 'https://bfkiifbzxwhbviluyzcp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HdcOSN5v1E4YBoQok996Mg_W1i1xnGx';
 
-const token = localStorage.getItem('glow_token');
+let token = localStorage.getItem('glow_token');
 if (!token) { window.location.href = 'index.html'; }
 
 function _cikis() { localStorage.clear(); window.location.href = 'index.html'; }
 
+// ---- Sessiz oturum yenileme (refresh_token) ----
+// 401 alınınca bir kez yenileme denenir ve istek tekrarlanır; yenileme de
+// başarısızsa login'e dönülür. Aynı anda gelen 401'ler tek yenilemeyi bekler
+// (GoTrue refresh token'ları döndürümlüdür; yarış oturumu geçersiz kılar).
+let _yenilemeUcusta = null;
+function _oturumYenile() {
+    if (_yenilemeUcusta) return _yenilemeUcusta;
+    _yenilemeUcusta = (async () => {
+        const rt = localStorage.getItem('glow_refresh');
+        if (!rt) return false;
+        try {
+            const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+                method: 'POST',
+                headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rt }),
+            });
+            if (!res.ok) {
+                // 4xx: refresh token geçersiz/iptal; ağ dışı kalıcı hata.
+                if (res.status >= 400 && res.status < 500) localStorage.removeItem('glow_refresh');
+                return false;
+            }
+            const d = await res.json();
+            if (!d.access_token) return false;
+            token = d.access_token;
+            localStorage.setItem('glow_token', token);
+            if (d.refresh_token) localStorage.setItem('glow_refresh', d.refresh_token);
+            return true;
+        } catch (_) { return false; }
+    })().finally(() => { _yenilemeUcusta = null; });
+    return _yenilemeUcusta;
+}
+
 async function _sbFetch(path, options = {}) {
-    const res = await fetch(`${SUPABASE_URL}${path}`, {
+    const istek = () => fetch(`${SUPABASE_URL}${path}`, {
         ...options,
         headers: {
             'apikey': SUPABASE_KEY,
@@ -28,6 +60,8 @@ async function _sbFetch(path, options = {}) {
             ...(options.headers || {}),
         },
     });
+    let res = await istek();
+    if (res.status === 401 && await _oturumYenile()) res = await istek();
     if (res.status === 401) { _cikis(); throw new Error('Yetkisiz'); }
     return res;
 }
@@ -73,6 +107,29 @@ async function _imzalaAlan(liste, alanlar) {
 // Panel fotoğraf yolları: imzalı URL'ler zaten mutlaktır, aynen geçir.
 function fotoUrl(x) { return x || ''; }
 
+// "firma-logo/{firma_id}/..." -> public URL (bucket herkese açık)
+function firmaLogoUrl(stored) {
+    if (!stored) return null;
+    if (/^https?:/.test(stored)) return stored;
+    return `${SUPABASE_URL}/storage/v1/object/public/${stored}`;
+}
+
+// Logo dosyasını Storage'a yükler; DB'de saklanacak "firma-logo/..." yolu döner.
+async function firmaLogoYukle(firmaId, file) {
+    const uzanti = (file.name.split('.').pop() || 'png').toLowerCase();
+    const yol = `firma-logo/${firmaId}/logo_${Date.now()}.${uzanti}`;
+    const res = await _sbFetch(`/storage/v1/object/${yol}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'image/png' },
+        body: file,
+    });
+    if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || 'Logo yüklenemedi.');
+    }
+    return yol;
+}
+
 // ---- Yardımcılar: PHP gövdesindeki serbest tipleri RPC tiplerine çevir ----
 const _int = (v) => (v === undefined || v === null || v === '' ? null : parseInt(v, 10));
 const _num = (v) => (v === undefined || v === null || v === '' ? null : parseFloat(v));
@@ -112,6 +169,22 @@ async function apiFetch(path, options = {}) {
                     p_site_id: _int(q.get('site_id')),
                 });
                 return _rpcYanit(r);
+            }
+
+            // ---------------- FİRMA AYARLARI ----------------
+            case 'admin/firma.php': {
+                if (options.method === 'POST') {
+                    const r = await _sbRpc('admin_firma_guncelle', {
+                        p_ad: _str(govde.ad),
+                        p_hex_color: _str(govde.hex_color),
+                        p_logo_path: _str(govde.logo),
+                        p_logo_set: 'logo' in govde,
+                    });
+                    return _rpcYanit(r);
+                }
+                // RLS zaten yalnız kendi firmayı gösterir.
+                const rows = await _sbList('firmalar?select=*&limit=1');
+                return _yanit(true, 200, { data: rows[0] || null });
             }
 
             // ---------------- PERSONELLER ----------------

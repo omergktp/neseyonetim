@@ -76,6 +76,8 @@ class ApiService {
     await prefs.remove('refresh_token');
     await prefs.remove('rol');
     await prefs.remove('ad_soyad');
+    await prefs.remove('firma_ad');
+    await prefs.remove('firma_logo_url');
   }
 
   static Future<String?> getRole() async {
@@ -178,6 +180,15 @@ class ApiService {
         if (adSoyad != null) await prefs.setString('ad_soyad', adSoyad.toString());
         final hexColor = data['firma']?['tema_rengi'];
         if (hexColor != null) await prefs.setString('theme_color', hexColor.toString());
+        final firmaAd = data['firma']?['ad'];
+        if (firmaAd != null) await prefs.setString('firma_ad', firmaAd.toString());
+        // Firma logosu (public URL) — splash/marka alanlarında gösterilir.
+        final logoUrl = data['firma']?['logo_url'];
+        if (logoUrl is String && logoUrl.isNotEmpty) {
+          await prefs.setString('firma_logo_url', logoUrl);
+        } else {
+          await prefs.remove('firma_logo_url');
+        }
         return {'success': true, 'data': data};
       }
       final msg = (data is Map ? data['message'] : null) ?? 'Giriş başarısız.';

@@ -123,9 +123,12 @@
                         btn.disabled = false;
                         return;
                     }
-                    // Token'ı localStorage'a kaydet ve yönlendir
+                    // Token'ları localStorage'a kaydet ve yönlendir
                     localStorage.setItem('glow_token', data.access_token);
+                    if (data.refresh_token) localStorage.setItem('glow_refresh', data.refresh_token);
+                    else localStorage.removeItem('glow_refresh');
                     localStorage.setItem('glow_user', JSON.stringify(data.kullanici));
+                    if (data.firma) localStorage.setItem('glow_firma', JSON.stringify(data.firma));
                     window.location.href = "dashboard.html";
                 } else {
                     document.getElementById('errorMessage').innerText = data.message || "Giriş başarısız.";

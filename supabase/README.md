@@ -22,6 +22,10 @@ supabase/
     0006_admin_rpc.sql            # Yönetici CRUD RPC'leri + FCM tetikleri + audit
     0007_views_reports.sql        # Okuma görünümleri (security_invoker) + dashboard/rapor
     0008_periodic.sql             # Periyodik üretim + pg_cron (her gece, İstanbul TZ)
+    0009_auth_bridge.sql          # GoTrue köprüsü (gölge kullanıcı + app_metadata claim'leri)
+    0010_guvenlik_firma.sql       # Sunucu tarafı 50m doğrulaması, kolon düzeyi grant,
+                                  # masraf-fis erişim kısıtı, rapor TZ düzeltmesi,
+                                  # admin_firma_guncelle (logo/renk)
   functions/
     _shared/cors.ts
     login/index.ts                # Özel giriş -> Supabase JWT
@@ -136,6 +140,23 @@ npx supabase db execute --file supabase/seed_data.sql   # (linked proje)
   özel JWT PostgREST/Realtime/Storage'a taşınır (GoTrue kullanılmaz).
 - `ApiService` HTTP çağrıları Supabase client çağrılarına dönüşür.
 - Görev/arıza listelerinde Realtime abonelikleri.
+
+---
+
+## Güncelleme dağıtımı (0010 + login v2)
+
+0010 migration'ı ve güncellenen `login` fonksiyonu (yanıta `firma.logo_url`
+eklendi) birlikte yayınlanmalı:
+
+```bash
+npx supabase db push
+npx supabase functions deploy login
+```
+
+Not: 0010 sonrası `personeller.sifre` ve `fcm_token` PostgREST'ten okunamaz
+(kolon düzeyi grant) ve `masraf-fis` bucket'ını yalnız teknik + yönetici
+görebilir. Görev başlatma/tamamlama artık sunucuda da 50 m kuralına tabidir
+(`app.konum_esigi_metre`).
 
 ---
 

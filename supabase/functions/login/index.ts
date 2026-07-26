@@ -140,6 +140,14 @@ Deno.serve(async (req) => {
   if (!verifyRes.ok) return json({ message: "Oturum açılamadı." }, 500);
   const session = await verifyRes.json();
 
+  // Logo DB'de "firma-logo/{firma_id}/..." yolu olarak durur (public bucket);
+  // istemciler için doğrudan görüntülenebilir URL'e çevrilir.
+  const logoUrl = firma.logo
+    ? (/^https?:/.test(firma.logo)
+      ? firma.logo
+      : `${supabaseUrl}/storage/v1/object/public/${firma.logo}`)
+    : null;
+
   // Eski login.php cevabıyla uyumlu + Supabase oturumu
   return json({
     message: "Giriş başarılı.",
@@ -148,6 +156,6 @@ Deno.serve(async (req) => {
     token_type: "bearer",
     expires_in: session.expires_in,
     kullanici: { ad_soyad: personel.ad_soyad, rol: personel.rol },
-    firma: { ad: firma.ad, logo: firma.logo, tema_rengi: firma.hex_color },
+    firma: { ad: firma.ad, logo: firma.logo, logo_url: logoUrl, tema_rengi: firma.hex_color },
   });
 });

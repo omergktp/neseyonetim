@@ -117,8 +117,8 @@
     <!-- Sidebar (mobilde off-canvas) -->
     <aside id="sidebar" class="w-64 bg-slate-900 text-white flex flex-col transition-transform duration-200 fixed lg:static inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0">
         <div class="h-16 flex items-center px-6 border-b border-slate-800">
-            <div class="w-8 h-8 flex items-center justify-center font-bold mr-3 shadow-lg shadow-indigo-500/30 border border-white/20" style="background: linear-gradient(135deg, #3B82F6, #8B5CF6); border-radius: 8px;">G</div>
-            <span class="text-lg font-bold tracking-tight">GLOW SAHA</span>
+            <div id="marka-logo" class="w-8 h-8 flex items-center justify-center font-bold mr-3 shadow-lg shadow-indigo-500/30 border border-white/20 overflow-hidden" style="background: linear-gradient(135deg, #3B82F6, #8B5CF6); border-radius: 8px;">G</div>
+            <span id="marka-ad" class="text-lg font-bold tracking-tight truncate">GLOW SAHA</span>
         </div>
 
         <div class="flex-1 overflow-y-auto py-4">
@@ -143,6 +143,9 @@
                 </a>
                 <a id="nav-periyodik" href="#" onclick="switchView('periyodik'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
                     <i class="fa-solid fa-repeat w-5 text-center"></i><span class="font-medium text-sm">Periyodik Görevler</span>
+                </a>
+                <a id="nav-firma" href="#" onclick="switchView('firma'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                    <i class="fa-solid fa-gear w-5 text-center"></i><span class="font-medium text-sm">Firma Ayarları</span>
                 </a>
             </nav>
         </div>
@@ -407,6 +410,54 @@
                         </tr></thead>
                         <tbody id="periyodik-tbody" class="text-sm divide-y divide-slate-100"></tbody>
                     </table></div>
+                </div>
+            </section>
+
+            <!-- ============ FİRMA AYARLARI ============ -->
+            <section id="view-firma" class="hidden">
+                <div class="mb-6">
+                    <h1 class="text-2xl font-bold text-slate-900">Firma Ayarları</h1>
+                    <p class="text-slate-500 mt-1">Marka bilgileriniz; mobil uygulama teması ve PDF rapor antetinde kullanılır.</p>
+                </div>
+                <div class="max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-100/50 p-6">
+                    <form id="firmaForm" class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Firma Kodu</label>
+                                <input id="firma-kodu" type="text" disabled class="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 font-mono">
+                                <p class="text-[11px] text-slate-400 mt-1">Personel girişte bu kodu kullanır; değiştirilemez.</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Firma Adı *</label>
+                                <input name="ad" type="text" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">Tema Rengi</label>
+                            <div class="flex items-center gap-3">
+                                <input id="firma-renk" type="color" value="#3B82F6" class="w-12 h-11 p-1 border border-slate-200 rounded-lg cursor-pointer bg-white">
+                                <input id="firma-renk-hex" type="text" pattern="^#[0-9A-Fa-f]{6}$" class="w-32 px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="#3B82F6">
+                                <span class="text-xs text-slate-400">Mobil uygulama bu renkle açılır.</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">Firma Logosu</label>
+                            <div class="flex items-center gap-4">
+                                <div id="firma-logo-onizleme" class="w-20 h-20 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden text-slate-300 text-2xl"><i class="fa-solid fa-image"></i></div>
+                                <div class="space-y-2">
+                                    <input id="firma-logo-dosya" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="block text-sm text-slate-500 file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-600 file:font-medium hover:file:bg-blue-100 file:cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <p class="text-[11px] text-slate-400">PNG/JPEG/WebP/SVG, önerilen: kare, ≤ 1MB.</p>
+                                        <button type="button" id="firma-logo-kaldir" onclick="firmaLogoKaldir()" class="hidden text-xs text-red-500 hover:text-red-600 font-medium"><i class="fa-solid fa-trash mr-1"></i>Logoyu kaldır</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-error text-sm text-red-500 hidden"></div>
+                        <div class="flex justify-end pt-2 border-t border-slate-100">
+                            <button id="firmaSubmitBtn" type="submit" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm mt-4">Kaydet</button>
+                        </div>
+                    </form>
                 </div>
             </section>
 
@@ -780,8 +831,8 @@
         function aktifBadge(aktif) { return aktif == 1 ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aktif</span>' : '<span class="inline-flex items-center gap-1.5 text-slate-400 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Pasif</span>'; }
 
         // ---- Görünüm geçişi ----
-        const BASLIKLAR = { dashboard:'Dashboard', personeller:'Personeller', siteler:'Siteler / Tesisler', isemirleri:'İş Emirleri', arizalar:'Arıza Kayıtları', masraflar:'Masraflar', periyodik:'Periyodik Görevler' };
-        const YUKLEYICI = { dashboard:loadDashboard, personeller:loadPersoneller, siteler:loadSiteler, isemirleri:loadIsEmirleri, arizalar:loadArizalar, masraflar:loadMasraflar, periyodik:loadPeriyodik };
+        const BASLIKLAR = { dashboard:'Dashboard', personeller:'Personeller', siteler:'Siteler / Tesisler', isemirleri:'İş Emirleri', arizalar:'Arıza Kayıtları', masraflar:'Masraflar', periyodik:'Periyodik Görevler', firma:'Firma Ayarları' };
+        const YUKLEYICI = { dashboard:loadDashboard, personeller:loadPersoneller, siteler:loadSiteler, isemirleri:loadIsEmirleri, arizalar:loadArizalar, masraflar:loadMasraflar, periyodik:loadPeriyodik, firma:loadFirma };
         function switchView(name) {
             document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
             document.getElementById('view-' + name).classList.remove('hidden');
@@ -1664,10 +1715,109 @@
             } catch (err) { formHata(e.target, 'Sunucuya bağlanılamadı.'); }
         });
 
+        // ---- FİRMA AYARLARI ----
+        let _firma = null;          // sunucudaki güncel firma kaydı
+        let _firmaLogoYeni = null;  // seçilen yeni dosya (File)
+        let _firmaLogoSil = false;  // "logoyu kaldır" işaretlendi mi
+
+        // Kenar çubuğundaki markayı firma logosu/adıyla değiştirir.
+        function markaGuncelle(firma) {
+            if (!firma) return;
+            if (firma.ad) document.getElementById('marka-ad').innerText = firma.ad;
+            const logoKutu = document.getElementById('marka-logo');
+            const url = firmaLogoUrl(firma.logo);
+            if (url) {
+                logoKutu.style.background = '#fff';
+                logoKutu.innerHTML = `<img src="${esc(url)}" class="w-full h-full object-contain" alt="logo">`;
+            }
+        }
+
+        function _firmaLogoOnizle(url) {
+            const kutu = document.getElementById('firma-logo-onizleme');
+            const kaldirBtn = document.getElementById('firma-logo-kaldir');
+            if (url) {
+                kutu.innerHTML = `<img src="${esc(url)}" class="w-full h-full object-contain" alt="logo">`;
+                kaldirBtn.classList.remove('hidden');
+            } else {
+                kutu.innerHTML = '<i class="fa-solid fa-image"></i>';
+                kaldirBtn.classList.add('hidden');
+            }
+        }
+
+        function firmaLogoKaldir() {
+            _firmaLogoSil = true;
+            _firmaLogoYeni = null;
+            document.getElementById('firma-logo-dosya').value = '';
+            _firmaLogoOnizle(null);
+        }
+
+        async function loadFirma() {
+            try {
+                _firma = (await (await apiFetch('admin/firma.php')).json()).data;
+                if (!_firma) return;
+                _firmaLogoYeni = null; _firmaLogoSil = false;
+                document.getElementById('firma-kodu').value = _firma.firma_kodu || '';
+                document.querySelector('#firmaForm input[name=ad]').value = _firma.ad || '';
+                const renk = /^#[0-9A-Fa-f]{6}$/.test(_firma.hex_color || '') ? _firma.hex_color : '#3B82F6';
+                document.getElementById('firma-renk').value = renk;
+                document.getElementById('firma-renk-hex').value = renk;
+                document.getElementById('firma-logo-dosya').value = '';
+                _firmaLogoOnizle(firmaLogoUrl(_firma.logo));
+                markaGuncelle(_firma);
+            } catch (e) { toast('Firma bilgileri alınamadı.', 'error'); console.error(e); }
+        }
+
+        // Renk seçici <-> hex kutusu senkron
+        document.getElementById('firma-renk').addEventListener('input', (e) => {
+            document.getElementById('firma-renk-hex').value = e.target.value.toUpperCase();
+        });
+        document.getElementById('firma-renk-hex').addEventListener('input', (e) => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) document.getElementById('firma-renk').value = e.target.value;
+        });
+
+        // Dosya seçilince yerel önizleme
+        document.getElementById('firma-logo-dosya').addEventListener('change', (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            if (f.size > 1024 * 1024) { toast('Logo 1MB\'den küçük olmalı.', 'warn'); e.target.value = ''; return; }
+            _firmaLogoYeni = f;
+            _firmaLogoSil = false;
+            _firmaLogoOnizle(URL.createObjectURL(f));
+        });
+
+        document.getElementById('firmaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!_firma) return;
+            const btn = document.getElementById('firmaSubmitBtn');
+            const hex = document.getElementById('firma-renk-hex').value.trim();
+            if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) { formHata(e.target, 'Renk #RRGGBB biçiminde olmalı.'); return; }
+            btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+            try {
+                const payload = { ad: e.target.ad.value, hex_color: hex };
+                if (_firmaLogoYeni) payload.logo = await firmaLogoYukle(_firma.id, _firmaLogoYeni);
+                else if (_firmaLogoSil) payload.logo = null;
+                const res = await apiFetch('admin/firma.php', { method: 'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (res.ok) {
+                    toast('Firma ayarları kaydedildi.', 'success');
+                    // Girişte saklanan markayı da tazele (diğer sayfalar okuyor)
+                    try {
+                        const f = JSON.parse(localStorage.getItem('glow_firma') || '{}');
+                        f.ad = payload.ad; f.tema_rengi = hex;
+                        if ('logo' in payload) f.logo = payload.logo;
+                        localStorage.setItem('glow_firma', JSON.stringify(f));
+                    } catch (_) {}
+                    loadFirma();
+                } else formHata(e.target, data.message || 'Kaydedilemedi.');
+            } catch (err) { formHata(e.target, err.message || 'Sunucuya bağlanılamadı.'); }
+            btn.disabled = false; btn.innerText = 'Kaydet';
+        });
+
         // ---- Başlangıç ----
         (function init() {
             _temaIkonGuncelle();
             try { const u = JSON.parse(localStorage.getItem('glow_user') || '{}'); if (u.ad_soyad) { document.getElementById('user-name').innerText = u.ad_soyad; document.getElementById('user-avatar').innerText = bashar(u.ad_soyad) || '?'; } } catch (_) {}
+            try { markaGuncelle(JSON.parse(localStorage.getItem('glow_firma') || 'null')); } catch (_) {}
             switchView('dashboard');
         })();
     </script>

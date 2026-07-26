@@ -82,7 +82,7 @@
         <!-- Rapor Başlığı / Antet -->
         <div class="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-8">
             <div class="flex items-center gap-4">
-                <div class="w-16 h-16 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                <div id="rapor-logo" class="w-16 h-16 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl overflow-hidden">
                     G
                 </div>
                 <div>
@@ -180,6 +180,19 @@
             return `${AY_ADLARI[parseInt(m, 10) - 1]} ${y}`;
         }
 
+        // Antette firma logosu (varsa) — "kendi logonuzu taşıyan rapor"
+        async function loadFirmaLogo() {
+            try {
+                const firma = (await (await apiFetch('admin/firma.php')).json()).data;
+                const url = firmaLogoUrl(firma && firma.logo);
+                if (url) {
+                    const kutu = document.getElementById('rapor-logo');
+                    kutu.className = 'w-16 h-16 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200 bg-white';
+                    kutu.innerHTML = `<img src="${esc(url)}" class="w-full h-full object-contain" alt="logo">`;
+                }
+            } catch (e) { console.error(e); }
+        }
+
         // Tesis seçiciyi doldur
         async function loadSiteler() {
             try {
@@ -258,6 +271,7 @@
             aySecici.value = ay;
             aySecici.addEventListener('change', loadRapor);
             document.getElementById('site-secici').addEventListener('change', loadRapor);
+            loadFirmaLogo();
             await loadSiteler();
             const preSite = params.get('site_id');
             if (preSite) document.getElementById('site-secici').value = preSite;
