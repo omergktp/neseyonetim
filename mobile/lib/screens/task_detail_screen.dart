@@ -197,7 +197,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         if (onay) path = photo.path;   // false ise döngü tekrar çeker
       }
 
-      final String fotoYolu = path!;
+      final String fotoYolu = path;
 
       // Idempotency anahtarı: ilk denemede üretilir; kuyruğa düşerse aynı
       // anahtarla tekrar denenir (sunucu mükerrer kaydı/mükerrer yüklemeyi önler).

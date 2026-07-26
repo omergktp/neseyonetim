@@ -126,7 +126,7 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
       Future<void> kuyrugaAl() async {
         String? kalici;
         if (fotoYolu != null) {
-          kalici = await OfflineQueue.fotoyuKaliciKopyala(fotoYolu!, istekId);
+          kalici = await OfflineQueue.fotoyuKaliciKopyala(fotoYolu, istekId);
         }
         await OfflineQueue.addRequest(
             'report_fault.php',
@@ -134,7 +134,7 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
               ...ortakAlanlar,
               if (kalici != null) 'fotograf_dosya': kalici
               else if (fotoYolu != null)
-                'fotograf_url': base64Encode(await File(fotoYolu!).readAsBytes()),
+                'fotograf_url': base64Encode(await File(fotoYolu).readAsBytes()),
             },
             istekId: istekId,
             personelId: pid);
@@ -152,7 +152,7 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
 
       final body = <String, dynamic>{
         ...ortakAlanlar,
-        if (fotoYolu != null) 'fotograf_url': base64Encode(await File(fotoYolu!).readAsBytes()),
+        if (fotoYolu != null) 'fotograf_url': base64Encode(await File(fotoYolu).readAsBytes()),
       };
       final sonuc = await ApiService.postQueued('report_fault.php', body);
       if (!mounted) return;
