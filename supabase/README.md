@@ -26,6 +26,10 @@ supabase/
     0010_guvenlik_firma.sql       # Sunucu tarafı 50m doğrulaması, kolon düzeyi grant,
                                   # masraf-fis erişim kısıtı, rapor TZ düzeltmesi,
                                   # admin_firma_guncelle (logo/renk)
+    0011_giris_kuyruk_saha.sql    # Giriş kilidi (rate limit), min şifre 10, QR'da da
+                                  # konum zorunluluğu, konum_dogrulandi bayrağı,
+                                  # istek_id idempotency, qr_kod kolon gizliliği,
+                                  # admin_qr_goster RPC
   functions/
     _shared/cors.ts
     login/index.ts                # Özel giriş -> Supabase JWT

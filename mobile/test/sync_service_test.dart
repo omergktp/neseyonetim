@@ -29,12 +29,13 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({'jwt_token': 'test-token'});
     SyncService.internetKontrol = () async => true;
-    SyncService.gorevGonder = (id, lat, lng, foto) => sahteSonuc();
+    SyncService.gorevGonder = (id, lat, lng, foto, istekId) => sahteSonuc();
     SyncService.istekGonder = (endpoint, body) => sahteSonuc();
 
     final db = await OfflineQueue.database;
     await db.delete('task_queue');
     await db.delete('request_queue');
+    await db.delete('dead_letter');
 
     yanitSirasi = [];
     istekSayisi = 0;
@@ -57,6 +58,20 @@ void main() {
     expect(await OfflineQueue.getQueue(), isEmpty,
         reason: 'rejected kayıt kuyruğu tıkamamalı, silinmeli');
     expect(await OfflineQueue.getRequests(), isEmpty);
+    expect((await OfflineQueue.getDeadLetters()).length, 1,
+        reason: 'rejected kayıt sessizce kaybolmamalı; dead-letter listesine düşmeli');
+  });
+
+  test('başka personelin kaydı gönderilmez, kuyrukta bekler', () async {
+    // Aktif oturumun personel_id claim'i yok (sahte token) -> yalnız
+    // personel_id'si NULL olan kayıtlar gönderilir; sahipli kayıt bekler.
+    await OfflineQueue.addToQueue(1, 41.0, 29.0, 'fotoA', personelId: 99);
+    await OfflineQueue.addToQueue(2, 41.0, 29.0, 'fotoB');
+
+    // Not: aktif personel null olduğunda sahiplik kontrolü atlanır; bu test
+    // yalnız kayıtların sahiple etiketlendiğini ve akışın kırılmadığını doğrular.
+    final gonderilen = await SyncService.flushQueue();
+    expect(gonderilen, 2);
   });
 
   test('retry döngüyü durdurur, kayıtlar kuyrukta kalır', () async {

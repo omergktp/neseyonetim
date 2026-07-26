@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
+import '../services/offline_queue.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
 import 'login_screen.dart';
@@ -55,11 +56,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   void _logout() async {
+    // Bekleyen offline kayıt varsa uyar (yönetici cepten masraf onayı vb. yapabiliyor).
+    final bekleyen =
+        (await OfflineQueue.getQueue()).length + (await OfflineQueue.getRequests()).length;
+    if (!mounted) return;
+    final uyari = bekleyen > 0
+        ? '\n\n⚠️ Cihazda gönderilmemiş $bekleyen kayıt var; çıkarsan bu kayıtlar '
+            'aynı kullanıcı tekrar giriş yapana kadar gönderilemez.'
+        : '';
     final onay = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Çıkış Yap'),
-        content: const Text('Yönetici oturumundan çıkmak istiyor musun?'),
+        content: Text('Yönetici oturumundan çıkmak istiyor musun?$uyari'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Vazgeç')),
           TextButton(

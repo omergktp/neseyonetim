@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:geolocator/geolocator.dart' show Geolocator;
 
 import '../services/camera_service.dart';
 import '../theme/app_theme.dart';
@@ -15,28 +16,70 @@ class CameraCaptureScreen extends StatefulWidget {
   State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
 }
 
-class _CameraCaptureScreenState extends State<CameraCaptureScreen> {
+class _CameraCaptureScreenState extends State<CameraCaptureScreen>
+    with WidgetsBindingObserver {
   CameraController? _cam;
   bool _ready = false;
   bool _capturing = false;
+  String? _hata;        // kamera açılamadıysa gösterilecek mesaj
+  bool _izinSorunu = false; // izin reddi: "Ayarlar'ı Aç" butonu göster
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
   }
 
+  // Kamera açılamazsa (izin reddi, kamerasız cihaz, başka uygulama kullanıyor)
+  // sonsuz "başlatılıyor" yerine açıklama + çözüm butonları gösterilir.
   Future<void> _init() async {
-    final cams = await CameraService.getCameras();
-    if (cams.isNotEmpty) {
+    setState(() {
+      _ready = false;
+      _hata = null;
+      _izinSorunu = false;
+    });
+    try {
+      final cams = await CameraService.getCameras();
+      if (cams.isEmpty) {
+        if (mounted) setState(() => _hata = 'Bu cihazda kullanılabilir kamera bulunamadı.');
+        return;
+      }
       _cam = CameraController(cams[0], ResolutionPreset.veryHigh, enableAudio: false);
       await _cam!.initialize();
       if (mounted) setState(() => _ready = true);
+    } on CameraException catch (e) {
+      if (!mounted) return;
+      final izin = e.code == 'CameraAccessDenied' || e.code == 'CameraAccessDeniedWithoutPrompt';
+      setState(() {
+        _izinSorunu = izin;
+        _hata = izin
+            ? 'Kamera izni verilmemiş. Fotoğraflı kanıt için kamera izni gerekli.'
+            : 'Kamera başlatılamadı: ${e.description ?? e.code}';
+      });
+    } catch (e) {
+      if (mounted) setState(() => _hata = 'Kamera başlatılamadı: $e');
+    }
+  }
+
+  // Uygulama arka plana alınınca kamerayı bırak, dönünce yeniden başlat
+  // (bazı cihazlarda controller askıda kalıp siyah ekran bırakıyordu).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final c = _cam;
+    if (c == null || !c.value.isInitialized) return;
+    if (state == AppLifecycleState.inactive) {
+      c.dispose();
+      _cam = null;
+      if (mounted) setState(() => _ready = false);
+    } else if (state == AppLifecycleState.resumed) {
+      _init();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cam?.dispose();
     super.dispose();
   }
@@ -66,9 +109,62 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> {
         backgroundColor: primary,
         foregroundColor: Colors.white,
       ),
-      body: _ready ? _buildCameraView() : _buildLoadingView(),
+      body: _ready
+          ? _buildCameraView()
+          : (_hata != null ? _buildErrorView() : _buildLoadingView()),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _ready ? _buildShutterButton() : null,
+    );
+  }
+
+  // Kamera açılamadı: açıklama + "Tekrar Dene" (+ izin sorununda "Ayarlar'ı Aç").
+  Widget _buildErrorView() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppTheme.cardShadow,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.no_photography_outlined, color: Colors.white70, size: 44),
+            const SizedBox(height: 14),
+            Text(
+              _hata ?? 'Kamera başlatılamadı.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 18),
+            if (_izinSorunu) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Geolocator.openAppSettings(),
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Ayarlar\'ı Aç'),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _init,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                ),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar Dene'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,13 +1,21 @@
 // supabase/functions/login/index.ts
 //
-// Özel giriş korunuyor: firma_kodu + telefon + sifre doğrulanır; ardından
-// personel GoTrue'da bir gölge kullanıcıya eşlenir ve GERÇEK bir Supabase
-// oturumu (ES256 imzalı access token + refresh token) döndürülür. Proje
-// asimetrik imzalama anahtarları kullandığı için özel HS256 üretimi geçersiz;
-// bu köprü sayesinde PostgREST/Realtime/Storage token'ı doğrudan tanır.
+// Özel giriş: firma_kodu + telefon + sifre doğrulanır; personel GoTrue'da bir
+// gölge kullanıcıya eşlenir ve GERÇEK bir Supabase oturumu (access + refresh
+// token) döndürülür. Özel claim'ler (firma_id / personel_id / rol) kullanıcının
+// app_metadata'sına yazılır ve her girişte tazelenir; RLS bunları app.current_*
+// ile okur.
 //
-// Özel claim'ler (firma_id / personel_id / rol) kullanıcının app_metadata'sına
-// yazılır ve her girişte tazelenir; RLS bunları app.current_* ile okur.
+// Sertleştirmeler (0011 ile birlikte):
+//  * Hız sınırı: (firma_kodu|telefon|ip) başına 5 hatalı deneme -> 15 dk kilit
+//    (login_guard RPC; yalnız service_role çağırabilir).
+//  * Numaralandırma oracle'ı kapalı: firma yok / kullanıcı yok / şifre yanlış
+//    ayrımı yapılmaz — tek tip 401. Kullanıcı bulunamadığında da sahte bcrypt
+//    karşılaştırması yapılır (zamanlama farkı sızdırmaz).
+//  * Gölge e-posta tahmin edilemez: p-<rastgele-uuid>@personel.glowsaha.app.
+//    Eski öngörülebilir (p<id>@...) adresler ilk girişte rastgeleye taşınır.
+//  * createUser hatasında e-postayla kullanıcı devralma (generateLink fallback)
+//    KALDIRILDI — "ilk kullanımda güven" açığıydı.
 //
 // Gerekli secret yok — SUPABASE_URL, SUPABASE_ANON_KEY ve
 // SUPABASE_SERVICE_ROLE_KEY otomatik sağlanır.
@@ -23,10 +31,9 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Personelin GoTrue gölge kullanıcısının e-postası (gerçek posta gitmez).
-function bridgeEmail(personelId: number | string): string {
-  return `p${personelId}@personel.glowsaha.app`;
-}
+const GENEL_HATA = "Firma kodu, telefon veya şifre hatalı.";
+// Zamanlama eşitleme için sabit (geçerli biçimli, anlamsız) bcrypt hash'i.
+const SAHTE_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -58,6 +65,38 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  // ---- Hız sınırı anahtarı: firma_kodu|telefon|ip ----
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "bilinmiyor";
+  const kilitAnahtari = `${firmaKodu}|${telefon}|${ip}`;
+
+  const guard = async (olay: "kontrol" | "hata" | "basari") => {
+    const { data } = await admin.rpc("login_guard", {
+      p_anahtar: kilitAnahtari,
+      p_olay: olay,
+    });
+    return data as { kilitli?: boolean; kalan_sn?: number } | null;
+  };
+
+  const kilit = await guard("kontrol");
+  if (kilit?.kilitli) {
+    return json(
+      { message: "Çok fazla hatalı deneme. Lütfen 15 dakika sonra tekrar deneyin." },
+      429,
+    );
+  }
+
+  // Tek tip başarısızlık: sayaç artar, ayrıntı sızdırılmaz.
+  const basarisiz = async () => {
+    const g = await guard("hata");
+    if (g?.kilitli) {
+      return json(
+        { message: "Çok fazla hatalı deneme. Lütfen 15 dakika sonra tekrar deneyin." },
+        429,
+      );
+    }
+    return json({ message: GENEL_HATA }, 401);
+  };
+
   // 1) Firma
   const { data: firma, error: fErr } = await admin
     .from("firmalar")
@@ -66,8 +105,10 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (fErr) return json({ message: "Sunucu hatası." }, 500);
-  if (!firma) return json({ message: "Geçersiz firma kodu." }, 404);
-  if (firma.aktif === false) return json({ message: "Firma hesabı aktif değil." }, 403);
+  if (!firma) {
+    bcrypt.compareSync(sifre, SAHTE_HASH); // zamanlama eşitleme
+    return await basarisiz();
+  }
 
   // 2) Personel (Multi-Tenant: firma_id + telefon)
   const { data: personel, error: pErr } = await admin
@@ -78,17 +119,24 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (pErr) return json({ message: "Sunucu hatası." }, 500);
-  if (!personel) return json({ message: "Kullanıcı bulunamadı." }, 404);
-  if (personel.aktif === false) return json({ message: "Kullanıcı hesabı aktif değil." }, 403);
+  if (!personel) {
+    bcrypt.compareSync(sifre, SAHTE_HASH); // zamanlama eşitleme
+    return await basarisiz();
+  }
 
   // 3) Şifre doğrulama. PHP password_hash bcrypt üretir ($2y$); bcryptjs
   //    $2a$/$2b$ bekler — $2y$ önekini normalize et (algoritma aynı).
   const stored = (personel.sifre ?? "").replace(/^\$2y\$/, "$2a$");
   const gecerli = bcrypt.compareSync(sifre, stored);
-  if (!gecerli) return json({ message: "Şifre hatalı." }, 401);
+  if (!gecerli) return await basarisiz();
+
+  // Hesap durumu ancak doğru şifreden SONRA açıklanır (numaralandırma önlenir).
+  if (firma.aktif === false) return json({ message: "Firma hesabı aktif değil." }, 403);
+  if (personel.aktif === false) return json({ message: "Kullanıcı hesabı aktif değil." }, 403);
+
+  await guard("basari");
 
   // 4) GoTrue gölge kullanıcısını hazırla; claim'leri her girişte tazele.
-  const email = bridgeEmail(personel.id);
   const appMeta = {
     firma_id: String(firma.id),
     personel_id: String(personel.id),
@@ -96,25 +144,37 @@ Deno.serve(async (req) => {
   };
 
   let authUserId: string | null = personel.auth_user_id;
+  let email: string | null = null;
+
   if (!authUserId) {
+    // Yeni köprü kullanıcısı: tahmin edilemez rastgele e-posta.
+    email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
       app_metadata: appMeta,
     });
-    if (cErr) {
-      // Kullanıcı zaten var olabilir (örn. auth_user_id kaydı kaybolduysa):
-      // magiclink üretimi kullanıcıyı e-postayla bulur, id'yi oradan alırız.
-      const { data: linkData, error: lErr } = await admin.auth.admin.generateLink({
-        type: "magiclink",
+    // NOT: hata durumunda e-postayla kullanıcı devralma YOK (güvenlik).
+    if (cErr || !created?.user) return json({ message: "Oturum açılamadı." }, 500);
+    authUserId = created.user.id;
+    const { error: bErr } = await admin
+      .from("personeller")
+      .update({ auth_user_id: authUserId })
+      .eq("id", personel.id);
+    if (bErr) return json({ message: "Oturum açılamadı." }, 500);
+  } else {
+    const { data: mevcut, error: gErr } = await admin.auth.admin.getUserById(authUserId);
+    if (gErr || !mevcut?.user) return json({ message: "Oturum açılamadı." }, 500);
+    email = mevcut.user.email ?? null;
+    // Eski öngörülebilir adresleri (p<id>@...) rastgeleye taşı.
+    if (!email || /^p\d+@/.test(email)) {
+      email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
+      const { error: eErr } = await admin.auth.admin.updateUserById(authUserId, {
         email,
+        email_confirm: true,
       });
-      if (lErr || !linkData?.user) return json({ message: "Oturum açılamadı." }, 500);
-      authUserId = linkData.user.id;
-    } else {
-      authUserId = created.user.id;
+      if (eErr) return json({ message: "Oturum açılamadı." }, 500);
     }
-    await admin.from("personeller").update({ auth_user_id: authUserId }).eq("id", personel.id);
   }
 
   const { error: uErr } = await admin.auth.admin.updateUserById(authUserId!, {
@@ -124,11 +184,11 @@ Deno.serve(async (req) => {
 
   // 5) Oturum üret: magiclink token'ı sunucu tarafında doğrulanır ve
   //    GoTrue gerçek bir oturum (access + refresh token) döndürür.
-  const { data: link, error: gErr } = await admin.auth.admin.generateLink({
+  const { data: link, error: lErr } = await admin.auth.admin.generateLink({
     type: "magiclink",
-    email,
+    email: email!,
   });
-  if (gErr || !link?.properties?.hashed_token) {
+  if (lErr || !link?.properties?.hashed_token) {
     return json({ message: "Oturum açılamadı." }, 500);
   }
 

@@ -197,17 +197,38 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         if (onay) path = photo.path;   // false ise döngü tekrar çeker
       }
 
-      // Fotoğrafı Base64'e çevir
-      final bytes = await File(path).readAsBytes();
-      String base64Image = base64Encode(bytes);
+      final String fotoYolu = path!;
+
+      // Idempotency anahtarı: ilk denemede üretilir; kuyruğa düşerse aynı
+      // anahtarla tekrar denenir (sunucu mükerrer kaydı/mükerrer yüklemeyi önler).
+      final istekId = ApiService.uuidV4();
 
       // 4. İnternet Kontrolü (Kural 3: Offline-first)
       bool hasInternet = await SyncService.hasInternet();
 
       int taskId = int.tryParse(widget.task['id'].toString()) ?? 0;
 
+      // Kuyruğa alma: fotoğraf base64 yerine kalıcı DOSYA olarak saklanır
+      // (DB şişmesi/OOM önlenir); kamera cache'inden kopyalanamazsa base64'e düşülür.
+      Future<void> kuyrugaAl() async {
+        final pid = await ApiService.currentPersonelId();
+        final kalici = await OfflineQueue.fotoyuKaliciKopyala(fotoYolu, istekId);
+        if (kalici != null) {
+          await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, '',
+              istekId: istekId, personelId: pid, fotografDosya: kalici);
+        } else {
+          final bytes = await File(fotoYolu).readAsBytes();
+          await OfflineQueue.addToQueue(
+              taskId, position.latitude, position.longitude, base64Encode(bytes),
+              istekId: istekId, personelId: pid);
+        }
+      }
+
       if (hasInternet) {
-        final sonuc = await ApiService.saveTask(taskId, position.latitude, position.longitude, base64Image);
+        final bytes = await File(path).readAsBytes();
+        final sonuc = await ApiService.saveTask(
+            taskId, position.latitude, position.longitude, base64Encode(bytes),
+            istekId: istekId);
         if (sonuc == 'ok') {
           await _kutlamaGoster('Konum doğrulandı, kanıt fotoğrafı sunucuya iletildi.');
         } else if (sonuc == 'rejected') {
@@ -215,11 +236,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           _showError('Sunucu görevi kabul etmedi. Görev durumu değişmiş olabilir, listeyi yenileyin.');
           return;
         } else {
-          await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, base64Image);
+          await kuyrugaAl();
           await _kutlamaGoster('Sunucuya ulaşılamadı; kayıt cihazda güvende, internet gelince otomatik gönderilecek.');
         }
       } else {
-        await OfflineQueue.addToQueue(taskId, position.latitude, position.longitude, base64Image);
+        await kuyrugaAl();
         await _kutlamaGoster('İnternet yok; kayıt cihazda güvende, bağlantı gelince otomatik gönderilecek.');
       }
 

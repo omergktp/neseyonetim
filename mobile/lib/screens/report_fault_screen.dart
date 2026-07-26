@@ -93,42 +93,74 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
       return;
     }
 
-    setState(() => _loading = true);
     try {
-      // Foto (varsa) çek -> filigranla (Kural 4) -> base64
-      String? base64Image;
+      // Foto (varsa): çek -> filigranla (Kural 4) -> ÖNİZLE (net değilse tekrar çek).
+      // Önizleme _loading'den ÖNCE yapılır; yoksa kullanıcı ne çektiğini göremiyordu.
+      String? fotoYolu;
       if (_camReady && _cam != null) {
-        final XFile photo = await _cam!.takePicture();
-        final pos = await LocationService.getCurrentLocation();
-        await CameraService.addWatermark(photo.path, pos?.latitude, pos?.longitude);
-        final bytes = await File(photo.path).readAsBytes();
-        base64Image = base64Encode(bytes);
+        while (fotoYolu == null) {
+          final XFile photo = await _cam!.takePicture();
+          final pos = await LocationService.getCurrentLocation();
+          await CameraService.addWatermark(photo.path, pos?.latitude, pos?.longitude);
+          if (!mounted) return;
+          final onay = await _fotoOnayla(photo.path);
+          if (onay == null) return; // vazgeçti
+          if (onay) fotoYolu = photo.path;
+        }
       }
 
-      final body = <String, dynamic>{
+      setState(() => _loading = true);
+
+      // Idempotency anahtarı: kuyruk tekrar denese de sunucu tek kayıt tutar.
+      final istekId = ApiService.uuidV4();
+      final pid = await ApiService.currentPersonelId();
+
+      final ortakAlanlar = <String, dynamic>{
         'site_id': _siteId,
         'baslik': _baslikController.text.trim(),
         if (_aciklamaController.text.trim().isNotEmpty) 'aciklama': _aciklamaController.text.trim(),
-        if (base64Image != null) 'fotograf_url': base64Image,
+        'istek_id': istekId,
       };
+
+      // Kuyruk gövdesi: base64 yerine kalıcı dosya yolu (DB şişmesini önler).
+      Future<void> kuyrugaAl() async {
+        String? kalici;
+        if (fotoYolu != null) {
+          kalici = await OfflineQueue.fotoyuKaliciKopyala(fotoYolu!, istekId);
+        }
+        await OfflineQueue.addRequest(
+            'report_fault.php',
+            {
+              ...ortakAlanlar,
+              if (kalici != null) 'fotograf_dosya': kalici
+              else if (fotoYolu != null)
+                'fotograf_url': base64Encode(await File(fotoYolu!).readAsBytes()),
+            },
+            istekId: istekId,
+            personelId: pid);
+      }
 
       // KURAL 3 (Offline-first): İnternet yoksa veya sunucuya ulaşılamazsa
       // kaydı kaybetme — kuyruğa al, bağlantı gelince otomatik gönderilir.
       if (!await SyncService.hasInternet()) {
-        await OfflineQueue.addRequest('report_fault.php', body);
+        await kuyrugaAl();
         if (!mounted) return;
         _msg('İnternet yok: arıza kaydı kuyruğa alındı, bağlantı gelince gönderilecek.');
         Navigator.pop(context);
         return;
       }
 
+      final body = <String, dynamic>{
+        ...ortakAlanlar,
+        if (fotoYolu != null) 'fotograf_url': base64Encode(await File(fotoYolu!).readAsBytes()),
+      };
       final sonuc = await ApiService.postQueued('report_fault.php', body);
       if (!mounted) return;
       if (sonuc == 'ok') {
         _msg('Arıza bildirildi.');
         Navigator.pop(context);
       } else if (sonuc == 'retry') {
-        await OfflineQueue.addRequest('report_fault.php', body);
+        await kuyrugaAl();
         if (!mounted) return;
         _msg('Sunucuya ulaşılamadı: kayıt kuyruğa alındı, bağlantı gelince gönderilecek.');
         Navigator.pop(context);
@@ -140,6 +172,34 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Çekilen (filigranlı) fotoğrafın önizlemesi.
+  /// true = onaylandı, false = tekrar çek, null = vazgeçildi.
+  Future<bool?> _fotoOnayla(String path) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fotoğraf net mi?'),
+        contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(File(path), height: 280, width: double.maxFinite, fit: BoxFit.cover),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, false),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tekrar Çek'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.check),
+            label: const Text('Onayla'),
+          ),
+        ],
+      ),
+    );
   }
 
   static OutlineInputBorder _ob(Color c, [double w = 1]) => OutlineInputBorder(

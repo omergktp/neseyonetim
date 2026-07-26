@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _yuklemeHatasi; // null: sorun yok; dolu: liste yüklenemedi (boş listeyle karışmasın)
   int _bugunTamamlanan = 0; // gün sonu "işimi bitirdim" sayacı
   int _bekleyenKuyruk = 0;  // offline kuyrukta gönderilmeyi bekleyen kayıt sayısı
+  int _olenKayit = 0;       // sunucunun kalıcı reddettiği (dead-letter) kayıt sayısı
 
   List<dynamic> _faults = [];
   bool _faultsLoading = false;
@@ -69,10 +70,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Offline kuyrukta bekleyen kayıt sayısı (rozet için)
     final bekleyen =
         (await OfflineQueue.getQueue()).length + (await OfflineQueue.getRequests()).length;
+    // Sunucunun kalıcı reddettiği kayıtlar (dead-letter): sessizce kaybolmaz,
+    // personel uyarı rozetinden görür.
+    final olen = (await OfflineQueue.getDeadLetters()).length;
 
     final result = await ApiService.getTasks();
     if (!mounted) return;
     _bekleyenKuyruk = bekleyen;
+    _olenKayit = olen;
     if (result['success']) {
       setState(() {
         _tasks = result['tasks'];
@@ -91,6 +96,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       UiUtils.showSnackBar(result['message'], isError: true);
     }
+  }
+
+  // Sunucunun kalıcı reddettiği kayıtların listesi: personel neyin
+  // gönderilemediğini görür ve gerekiyorsa kaydı elle yeniden oluşturur.
+  Future<void> _olenKayitlariGoster() async {
+    final kayitlar = await OfflineQueue.getDeadLetters();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gönderilemeyen Kayıtlar'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: kayitlar.isEmpty
+              ? const Text('Gönderilemeyen kayıt yok.')
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: kayitlar.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  itemBuilder: (_, i) => Text(
+                    '• ${kayitlar[i]['ozet']}',
+                    style: const TextStyle(fontSize: 13.5, height: 1.4),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await OfflineQueue.clearDeadLetters();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) setState(() => _olenKayit = 0);
+            },
+            child: const Text('Listeyi Temizle'),
+          ),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kapat')),
+        ],
+      ),
+    );
   }
 
   // Token süresi dolduğunda: oturumu temizle ve login'e dön (tema/IP korunur).
@@ -119,13 +162,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _logout() async {
+    // Gönderilmemiş kuyruk varsa özellikle uyar: çıkış sonrası bu kayıtlar
+    // ancak AYNI kullanıcı yeniden giriş yapınca gönderilebilir (başka hesabın
+    // kimliğiyle asla gönderilmez).
+    final bekleyen =
+        (await OfflineQueue.getQueue()).length + (await OfflineQueue.getRequests()).length;
+    if (!mounted) return;
+    final kuyrukUyarisi = bekleyen > 0
+        ? '\n\n⚠️ Gönderilmemiş $bekleyen kayıt var! Çıkarsan bu kayıtlar sen tekrar '
+            'giriş yapana kadar gönderilemez. Mümkünse önce internet varken '
+            '"Yenile"ye basıp kuyruğun boşalmasını bekle.'
+        : '';
     final onay = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Çıkış Yap'),
-        content: const Text(
+        content: Text(
           'Çıkış yaparsan bu cihaza yeni görev bildirimleri GELMEZ. '
-          'Vardiyan bittiyse çıkış yapmana gerek yok, uygulamayı kapatman yeterli.\n\n'
+          'Vardiyan bittiyse çıkış yapmana gerek yok, uygulamayı kapatman yeterli.'
+          '$kuyrukUyarisi\n\n'
           'Yine de çıkmak istiyor musun?',
         ),
         actions: [
@@ -168,6 +223,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     final actions = [
+      // Dead-letter uyarısı: sunucunun reddettiği kayıtlar sessizce kaybolmaz.
+      if (_olenKayit > 0)
+        IconButton(
+          icon: Badge(
+            label: Text('$_olenKayit'),
+            backgroundColor: Colors.red,
+            child: const Icon(Icons.error_outline),
+          ),
+          tooltip: 'Gönderilemeyen kayıtlar',
+          onPressed: _olenKayitlariGoster,
+        ),
       // Offline kuyruk rozeti: personel "kaydım kayboldu mu?" endişesi yaşamasın.
       if (_bekleyenKuyruk > 0)
         IconButton(

@@ -72,30 +72,58 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       return;
     }
 
+    // Tutar doğrulaması: Türkçe klavyede virgül gelebilir; sunucuya nokta gider.
+    final tutarStr = _tutarController.text.trim().replaceAll(',', '.');
+    final tutar = double.tryParse(tutarStr);
+    if (tutar == null || tutar <= 0) {
+      UiUtils.showSnackBar('Tutar geçerli ve pozitif bir sayı olmalı. Örn: 149.90', isError: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final XFile photo = await _cameraController!.takePicture();
-      final bytes = await File(photo.path).readAsBytes();
-      String base64Image = base64Encode(bytes);
 
-      final body = <String, dynamic>{
+      // Idempotency anahtarı: kuyruk tekrar denese de sunucu tek kayıt tutar.
+      final istekId = ApiService.uuidV4();
+      final pid = await ApiService.currentPersonelId();
+
+      final ortakAlanlar = <String, dynamic>{
         if (widget.isEmriId != null) 'is_emri_id': widget.isEmriId,
         if (widget.arizaId != null) 'ariza_id': widget.arizaId,
         'kalem_adi': _kalemAdiController.text.trim(),
-        'tutar': _tutarController.text.trim(),
-        'fis_fotograf_url': base64Image,
+        'tutar': tutarStr,
+        'istek_id': istekId,
       };
+
+      // Kuyruk gövdesi: base64 yerine kalıcı dosya yolu (DB şişmesini önler).
+      Future<void> kuyrugaAl() async {
+        final kalici = await OfflineQueue.fotoyuKaliciKopyala(photo.path, istekId);
+        await OfflineQueue.addRequest(
+            'add_expense.php',
+            {
+              ...ortakAlanlar,
+              if (kalici != null) 'fis_fotograf_dosya': kalici
+              else 'fis_fotograf_url': base64Encode(await File(photo.path).readAsBytes()),
+            },
+            istekId: istekId,
+            personelId: pid);
+      }
 
       // KURAL 3 (Offline-first): İnternet yoksa/sunucuya ulaşılamazsa fiş kaybolmasın.
       if (!await SyncService.hasInternet()) {
-        await OfflineQueue.addRequest('add_expense.php', body);
+        await kuyrugaAl();
         if (!mounted) return;
         UiUtils.showSnackBar('İnternet yok: masraf kuyruğa alındı, bağlantı gelince gönderilecek.');
         Navigator.pop(context);
         return;
       }
 
+      final body = <String, dynamic>{
+        ...ortakAlanlar,
+        'fis_fotograf_url': base64Encode(await File(photo.path).readAsBytes()),
+      };
       final sonuc = await ApiService.postQueued('add_expense.php', body);
       if (!mounted) return;
 
@@ -103,7 +131,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         UiUtils.showSnackBar('Masraf formu gönderildi ve onaya sunuldu.');
         Navigator.pop(context);
       } else if (sonuc == 'retry') {
-        await OfflineQueue.addRequest('add_expense.php', body);
+        await kuyrugaAl();
         if (!mounted) return;
         UiUtils.showSnackBar('Sunucuya ulaşılamadı: masraf kuyruğa alındı, bağlantı gelince gönderilecek.');
         Navigator.pop(context);

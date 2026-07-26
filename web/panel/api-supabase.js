@@ -223,8 +223,17 @@ async function apiFetch(path, options = {}) {
                     });
                     return _rpcYanit(r);
                 }
-                const data = await _sbList('siteler?select=*&order=ad.asc');
+                // qr_kod kolon düzeyinde kısıtlı (0011); QR ancak admin_qr_goster ile alınır.
+                const data = await _sbList('siteler?select=id,firma_id,ad,adres,enlem,boylam,olusturma_tarihi,aktif&order=ad.asc');
                 return _yanit(true, 200, { data });
+            }
+
+            // ---------------- QR GÖRÜNTÜLEME (yalnız yönetici) ----------------
+            case 'admin/qr.php': {
+                const r = await _sbRpc('admin_qr_goster', {
+                    p_tip: _str(q.get('tip')), p_id: _int(q.get('id')),
+                });
+                return _rpcYanit(r);
             }
 
             // ---------------- İŞ EMİRLERİ ----------------

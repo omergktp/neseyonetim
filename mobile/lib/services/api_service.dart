@@ -54,6 +54,21 @@ class ApiService {
   static Future<int?> _firmaId() async => int.tryParse(await _claim('firma_id') ?? '');
   static Future<int?> _personelId() async => int.tryParse(await _claim('personel_id') ?? '');
 
+  /// Oturumdaki personelin id'si (offline kuyruk kayıtlarını sahibine
+  /// bağlamak için ekranlardan da erişilir).
+  static Future<int?> currentPersonelId() => _personelId();
+
+  /// Basit UUID v4 üretimi (idempotency anahtarı; kripto güvenliği gerekmez,
+  /// yalnız benzersizlik yeterli).
+  static String uuidV4() {
+    final r = Random.secure();
+    final b = List<int>.generate(16, (_) => r.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // variant
+    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
   /// Kayıtlı token'ın süresi (exp) hâlâ geçerli mi? (offline'da da çalışır)
   static Future<bool> isTokenValid() async {
     final token = await _getToken();
@@ -95,16 +110,21 @@ class ApiService {
 
   /// base64 görseli Storage'a yükler; DB'de saklanacak "bucket/obje_yolu" döner.
   /// Obje yolu firma_id ile başlar (Storage RLS izolasyonu).
-  static Future<String> _uploadBase64(String base64Image, String bucket, String subdir) async {
+  ///
+  /// [sabitAd] verilirse nesne adı deterministik olur ve upsert açılır:
+  /// offline kuyruk aynı kaydı tekrar denediğinde AYNI nesnenin üzerine yazar
+  /// (öksüz dosya birikmez, mükerrer yükleme olmaz).
+  static Future<String> _uploadBase64(String base64Image, String bucket, String subdir,
+      {String? sabitAd}) async {
     final firma = await _firmaId();
     if (firma == null) throw const AuthException('Oturum bulunamadı.');
     final raw = base64Image.contains(',') ? base64Image.split(',').last : base64Image;
     final bytes = base64Decode(raw);
-    final objectPath = '$firma/$subdir/${_rndName()}';
+    final objectPath = '$firma/$subdir/${sabitAd ?? _rndName()}';
     await _sb.storage.from(bucket).uploadBinary(
           objectPath,
           bytes,
-          fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+          fileOptions: FileOptions(contentType: 'image/jpeg', upsert: sabitAd != null),
         );
     return '$bucket/$objectPath';
   }
@@ -124,13 +144,21 @@ class ApiService {
   // -------- Hata -> kuyruk sözleşmesi ('ok' | 'rejected' | 'retry') --------
 
   /// RPC'yi çalıştırır; kuyruk sözleşmesine göre sonuç döndürür.
+  ///
+  /// Sınıflandırma SQLSTATE koduna göre yapılır: yalnız KALICI iş kuralı
+  /// redleri (PT4xx ve veri/kısıt/yetki sınıfları) 'rejected' sayılır;
+  /// sunucu hatası (PT5xx/5xx), zaman aşımı, bağlantı sınıfları 'retry'dir.
+  /// (Eski davranış tüm PostgrestException'ları rejected sayıp offline
+  /// kuyrukta sessiz veri kaybına yol açıyordu.)
   static Future<String> _rpcQueued(String fn, Map<String, dynamic> params) async {
     try {
       await _sb.rpc(fn, params: params);
       return 'ok';
-    } on PostgrestException catch (_) {
-      // İş kuralı reddi (PTxxx / 4xx) — tekrar denemek anlamsız.
-      return 'rejected';
+    } on PostgrestException catch (e) {
+      final code = e.code ?? '';
+      final kalici = code.startsWith('PT4') ||
+          (code.length >= 2 && const ['22', '23', '42'].contains(code.substring(0, 2)));
+      return kalici ? 'rejected' : 'retry';
     } on AuthException catch (_) {
       return 'retry'; // oturum sorunu — yeniden giriş sonrası denenebilir
     } on StorageException catch (_) {
@@ -216,8 +244,10 @@ class ApiService {
     try {
       final rows = await _sb
           .from('is_emirleri')
+          // qr_kod bilinçli olarak seçilmez: QR değeri istemciye inmez (0011),
+          // doğrulama tamamen sunucuda (start_task) yapılır.
           .select(
-              'id,baslik,aciklama,durum,qr_kod,planlanan_baslangic_tarihi, siteler(ad,adres,enlem,boylam), is_emirleri_alt_gorevler(id,gorev_metni,yapildi_mi)')
+              'id,baslik,aciklama,durum,planlanan_baslangic_tarihi, siteler(ad,adres,enlem,boylam), is_emirleri_alt_gorevler(id,gorev_metni,yapildi_mi)')
           .inFilter('durum', ['bekliyor', 'devam_ediyor']).order('planlanan_baslangic_tarihi', ascending: true);
 
       final tasks = (rows as List).map((r) {
@@ -234,7 +264,6 @@ class ApiService {
           'baslik': r['baslik'],
           'aciklama': r['aciklama'],
           'durum': r['durum'],
-          'qr_kod': r['qr_kod'],
           'planlanan_baslangic_tarihi': r['planlanan_baslangic_tarihi'],
           'site_adi': s?['ad'],
           'site_adresi': s?['adres'],
@@ -268,7 +297,7 @@ class ApiService {
     try {
       final rows = await _sb
           .from('siteler')
-          .select('id,ad,adres,enlem,boylam,qr_kod,aktif')
+          .select('id,ad,adres,enlem,boylam,aktif')
           .eq('aktif', true)
           .order('ad', ascending: true);
       return rows as List;
@@ -301,10 +330,16 @@ class ApiService {
   // ======================= YAZMA (mobil) =======================
 
   /// Görevi tamamla. Fotoğraf Storage'a yüklenir; sonra save_task RPC.
-  static Future<String> saveTask(int isEmriId, double lat, double lng, String base64Image) async {
+  /// [istekId] verilirse fotoğraf deterministik adla (upsert) yüklenir:
+  /// offline kuyruk tekrar denediğinde mükerrer nesne oluşmaz.
+  static Future<String> saveTask(int isEmriId, double lat, double lng, String base64Image,
+      {String? istekId}) async {
     String? path;
     try {
-      if (base64Image.isNotEmpty) path = await _uploadBase64(base64Image, _bucketIsEmri, 'tasks');
+      if (base64Image.isNotEmpty) {
+        path = await _uploadBase64(base64Image, _bucketIsEmri, 'tasks',
+            sabitAd: istekId != null ? 'q_$istekId.jpg' : null);
+      }
     } on SocketException catch (_) {
       return 'retry';
     } on StorageException catch (_) {
@@ -320,34 +355,60 @@ class ApiService {
     });
   }
 
+  /// Gövdedeki fotoğrafı çözer: [b64Key] base64 içerik ya da [dosyaKey]
+  /// cihazdaki dosya yolu olabilir (offline kuyruk artık base64 yerine dosya
+  /// yolu saklar — bellek ve DB şişmesini önler).
+  static Future<String?> _bodyFoto(Map<String, dynamic> body, String b64Key, String dosyaKey) async {
+    final b64 = body[b64Key];
+    if (b64 is String && b64.isNotEmpty) return b64;
+    final dosya = body[dosyaKey];
+    if (dosya is String && dosya.isNotEmpty) {
+      return base64Encode(await File(dosya).readAsBytes());
+    }
+    return null;
+  }
+
   /// Kuyruklanabilir POST (offline replay). Endpoint adına göre RPC'ye eşlenir;
-  /// gömülü base64 fotoğraf önce Storage'a yüklenir. Sözleşme: 'ok'|'rejected'|'retry'.
+  /// fotoğraf önce Storage'a yüklenir. Sözleşme: 'ok'|'rejected'|'retry'.
+  /// body['istek_id'] varsa hem yükleme adı hem RPC idempotency anahtarı olur.
   static Future<String> postQueued(String endpoint, Map<String, dynamic> body) async {
+    final istekId = body['istek_id'] as String?;
     try {
       switch (endpoint) {
         case 'report_fault.php':
           String? foto;
-          if (body['fotograf_url'] != null) {
-            foto = await _uploadBase64(body['fotograf_url'], _bucketAriza, 'faults');
+          final b64 = await _bodyFoto(body, 'fotograf_url', 'fotograf_dosya');
+          if (b64 != null) {
+            foto = await _uploadBase64(b64, _bucketAriza, 'faults',
+                sabitAd: istekId != null ? 'q_$istekId.jpg' : null);
           }
           return _rpcQueued('report_fault', {
             'p_site_id': body['site_id'],
             'p_baslik': body['baslik'],
             'p_aciklama': body['aciklama'],
             'p_fotograf_path': foto,
+            'p_istek_id': istekId,
           });
         case 'add_expense.php':
-          final foto = await _uploadBase64(body['fis_fotograf_url'], _bucketMasraf, 'expenses');
+          final b64 = await _bodyFoto(body, 'fis_fotograf_url', 'fis_fotograf_dosya');
+          if (b64 == null) return 'rejected';
+          final foto = await _uploadBase64(b64, _bucketMasraf, 'expenses',
+              sabitAd: istekId != null ? 'q_$istekId.jpg' : null);
+          // Türkçe klavyede ondalık ayracı virgül gelebilir.
+          final tutar = num.tryParse(body['tutar'].toString().replaceAll(',', '.'));
           return _rpcQueued('add_expense', {
             'p_is_emri_id': body['is_emri_id'],
             'p_ariza_id': body['ariza_id'],
             'p_kalem_adi': body['kalem_adi'],
-            'p_tutar': num.tryParse(body['tutar'].toString()),
+            'p_tutar': tutar,
             'p_fis_fotograf_path': foto,
+            'p_istek_id': istekId,
           });
         default:
           return 'rejected';
       }
+    } on FileSystemException catch (_) {
+      return 'rejected'; // kuyruktaki fotoğraf dosyası kaybolmuş — tekrar denemek anlamsız
     } on SocketException catch (_) {
       return 'retry';
     } on StorageException catch (_) {

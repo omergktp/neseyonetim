@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 import 'api_service.dart';
@@ -34,8 +35,10 @@ class SyncService {
   /// Test dikişleri: birim testte gerçek Supabase istemcisi çalışmaz;
   /// test 'ok' | 'rejected' | 'retry' döndüren sahteler enjekte eder.
   /// Üretimde daima ApiService'e gider.
-  static Future<String> Function(int isEmriId, double enlem, double boylam, String foto)
-      gorevGonder = ApiService.saveTask;
+  static Future<String> Function(
+          int isEmriId, double enlem, double boylam, String foto, String? istekId)
+      gorevGonder = (id, enlem, boylam, foto, istekId) =>
+          ApiService.saveTask(id, enlem, boylam, foto, istekId: istekId);
   static Future<String> Function(String endpoint, Map<String, dynamic> body) istekGonder =
       ApiService.postQueued;
 
@@ -58,9 +61,11 @@ class SyncService {
 
   /// Kuyruktaki tüm görevleri ve bekleyen istekleri (arıza/masraf) sırayla API'ye gönderir.
   /// 'ok'       -> kuyruktan silinir (gönderildi sayılır)
-  /// 'rejected' -> kuyruktan silinir ama sayılmaz (sunucu kalıcı reddetti; ör. görev zaten
-  ///               kapalı — tekrar denemek anlamsız ve arkasındaki kayıtları tıkar)
+  /// 'rejected' -> kuyruktan silinir ama SESSİZCE KAYBOLMAZ: dead-letter'a
+  ///               taşınır ve kullanıcıya gösterilir (uzman paneli 🔴2b).
   /// 'retry'    -> ağ/geçici hata; bu tur biter, kalanlar sonraki bağlantıda denenir.
+  /// Başka bir personelin (çıkış yapmış hesabın) kayıtları GÖNDERİLMEZ; o
+  /// personel yeniden giriş yapana dek bekler (yanlış kimlikle yazım önlenir).
   /// Gönderilen kayıt sayısını döndürür.
   static Future<int> flushQueue() async {
     if (_isSyncing) return 0;
@@ -71,26 +76,61 @@ class SyncService {
       // İnternet yoksa hiç uğraşma
       if (!await internetKontrol()) return 0;
 
+      final aktifPersonel = await ApiService.currentPersonelId();
+
+      bool baskasinin(Object? sahip) =>
+          sahip != null && aktifPersonel != null && (sahip as num).toInt() != aktifPersonel;
+
       final items = await OfflineQueue.getQueue();
       for (final item in items) {
+        if (baskasinin(item['personel_id'])) continue;
         final int isEmriId = (item['is_emri_id'] as num).toInt();
         final double enlem = (item['enlem'] as num).toDouble();
         final double boylam = (item['boylam'] as num).toDouble();
-        final String foto = item['fotograf_base64'] as String;
+        final String? istekId = item['istek_id'] as String?;
+        final String? dosya = item['fotograf_dosya'] as String?;
 
-        final sonuc = await gorevGonder(isEmriId, enlem, boylam, foto);
+        // v3: fotoğraf dosya yolundan okunur; eski satırlar base64 taşır.
+        String foto = (item['fotograf_base64'] as String?) ?? '';
+        if (foto.isEmpty && dosya != null && dosya.isNotEmpty) {
+          try {
+            foto = base64Encode(await File(dosya).readAsBytes());
+          } catch (_) {
+            await OfflineQueue.addDeadLetter(
+                'gorev', 'save_task', 'Görev #$isEmriId: kanıt fotoğrafı cihazda bulunamadı.');
+            await OfflineQueue.removeFromQueue(item['id'] as int);
+            continue;
+          }
+        }
+
+        final sonuc = await gorevGonder(isEmriId, enlem, boylam, foto, istekId);
         if (sonuc == 'retry') break;
+        if (sonuc == 'rejected') {
+          await OfflineQueue.addDeadLetter('gorev', 'save_task',
+              'Görev #$isEmriId tamamlanamadı: sunucu kaydı kabul etmedi (görev kapatılmış/değişmiş olabilir).');
+        }
         await OfflineQueue.removeFromQueue(item['id'] as int);
+        await OfflineQueue.fotoDosyasiniSil(dosya);
         if (sonuc == 'ok') gonderilen++;
       }
 
       // Genel istek kuyruğu (arıza bildirimi, masraf vb. — Kural 3)
       final requests = await OfflineQueue.getRequests();
       for (final req in requests) {
+        if (baskasinin(req['personel_id'])) continue;
         final body = jsonDecode(req['body'] as String) as Map<String, dynamic>;
-        final sonuc = await istekGonder(req['endpoint'] as String, body);
+        final endpoint = req['endpoint'] as String;
+        final sonuc = await istekGonder(endpoint, body);
         if (sonuc == 'retry') break;
+        if (sonuc == 'rejected') {
+          final ozet = endpoint == 'add_expense.php'
+              ? 'Masraf "${body['kalem_adi'] ?? '-'}" gönderilemedi: sunucu kaydı kabul etmedi.'
+              : 'Arıza "${body['baslik'] ?? '-'}" gönderilemedi: sunucu kaydı kabul etmedi.';
+          await OfflineQueue.addDeadLetter('istek', endpoint, ozet);
+        }
         await OfflineQueue.removeRequest(req['id'] as int);
+        await OfflineQueue.fotoDosyasiniSil(
+            (body['fotograf_dosya'] ?? body['fis_fotograf_dosya']) as String?);
         if (sonuc == 'ok') gonderilen++;
       }
     } catch (_) {
