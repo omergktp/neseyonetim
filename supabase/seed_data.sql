@@ -3,6 +3,11 @@
 -- Şema (0001..0008) UYGULANDIKTAN SONRA çalıştırılır.
 -- Not: fotoğraf yolları eski (uploads/...) biçimdedir; dosyalar Storage'a
 -- taşınmadıysa görüntülenmez (imzalı URL üretimi güvenle null döner).
+--
+-- GÜVENLİK: Tüm personel şifreleri DEMO değeridir: "GlowDemo2026".
+-- Gerçek ortama açmadan önce panelden her personel için yeni şifre belirle.
+-- (Gerçek hash'ler ve FCM token'ları bu dosyadan kaldırılmıştır; canlı
+-- ortamdaki karşılıkları rotasyona sokulmuştur.)
 -- =====================================================================
 
 begin;
@@ -12,14 +17,14 @@ insert into firmalar (id, firma_kodu, ad, logo, hex_color, olusturma_tarihi, akt
 select setval(pg_get_serial_sequence('public.firmalar','id'), coalesce((select max(id) from firmalar), 1), true);
 
 -- personeller (4 satır)
-insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('1', '1', 'Admin Kullanıcı', '05554443322', '$2y$10$KpIcEao4lUwMaseE6dKkcevLftNnwLRxi1Ptz7Ap4nCRAHpivsGP6', 'yonetici', NULL, '2026-05-22 14:40:19', true);
-insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('2', '1', 'Test Personel', '05555555555', '$2y$10$DXFGvkS5g0dFulR6ftlNg.FLOphO.ntEQYiC5BGDImWxM8gE4svnK', 'temizlik', NULL, '2026-06-13 11:01:16', true);
-insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('3', '1', 'Test Teknik', '05444444444', '$2y$10$0wR/wxj65uTGq8boGqaVWuxkEXkGIocu0RJACD2St8k5VkAK0idpS', 'teknik', 'cHEZuq6zS3OeaPXy2ejBms:APA91bEosrsrN1eAGBNcWhz7CCTDhy79Zwymrhrtx5tgXKo5y-DoAdhvUSrdOZMBR1OuQCgrjki5jv87yyOa2Qyk09rGC12Tue1Nz7TcBqiBzhnsc5qwIR4', '2026-06-13 12:53:32', true);
-insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('5', '1', 'ahmet yönen (temizlik)', '05553333333', '$2y$10$ZHdlEGEhMX7ltg7X6xyAtOKJaow6iwnwGZOs/8BMwqL7o5M9HYRXW', 'temizlik', 'cHEZuq6zS3OeaPXy2ejBms:APA91bGlCMi1PgwIPVZKtv7G1cDmSiQiWNtv7CEQM8YoTsFi-Zk2kv9-OZiGIzMIE8ecaLLERJiQb8KX_DMfHyowo6in9-N6ssIbCuq8xICAomLzxbMUiVA', '2026-06-19 15:49:04', true);
+insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('1', '1', 'Admin Kullanıcı', '05554443322', '$2a$10$cjJjklpba0DywR8fxtDdX.3IpbZILcXYbFa7NAHZEllXVzQ43k1K6', 'yonetici', NULL, '2026-05-22 14:40:19', true);
+insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('2', '1', 'Test Personel', '05555555555', '$2a$10$cjJjklpba0DywR8fxtDdX.3IpbZILcXYbFa7NAHZEllXVzQ43k1K6', 'temizlik', NULL, '2026-06-13 11:01:16', true);
+insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('3', '1', 'Test Teknik', '05444444444', '$2a$10$cjJjklpba0DywR8fxtDdX.3IpbZILcXYbFa7NAHZEllXVzQ43k1K6', 'teknik', NULL, '2026-06-13 12:53:32', true);
+insert into personeller (id, firma_id, ad_soyad, telefon, sifre, rol, fcm_token, olusturma_tarihi, aktif) values ('5', '1', 'ahmet yönen (temizlik)', '05553333333', '$2a$10$cjJjklpba0DywR8fxtDdX.3IpbZILcXYbFa7NAHZEllXVzQ43k1K6', 'temizlik', NULL, '2026-06-19 15:49:04', true);
 select setval(pg_get_serial_sequence('public.personeller','id'), coalesce((select max(id) from personeller), 1), true);
 
 -- siteler (6 satır)
-insert into siteler (id, firma_id, ad, adres, enlem, boylam, qr_kod, olusturma_tarihi, aktif) values ('1', '1', 'Güneş Sitesi Merkez', 'İstanbul', '0.00000000', '0.00000000', 'SAHA-D22F669CB7', '2026-05-22 14:40:19', true);
+insert into siteler (id, firma_id, ad, adres, enlem, boylam, qr_kod, olusturma_tarihi, aktif) values ('1', '1', 'Güneş Sitesi Merkez', 'İstanbul', NULL, NULL, 'SAHA-D22F669CB7', '2026-05-22 14:40:19', true);
 insert into siteler (id, firma_id, ad, adres, enlem, boylam, qr_kod, olusturma_tarihi, aktif) values ('4', '1', 'Elit Yaşam Evleri', 'Ataşehir, İstanbul', '40.99250000', '29.12750000', 'SAHA-3B5F1D788D', '2026-06-14 00:13:48', true);
 insert into siteler (id, firma_id, ad, adres, enlem, boylam, qr_kod, olusturma_tarihi, aktif) values ('5', '1', 'Bahçeşehir Konakları', 'Başakşehir, İstanbul', '41.07000000', '28.65000000', 'SAHA-3D8012566D', '2026-06-14 00:13:48', true);
 insert into siteler (id, firma_id, ad, adres, enlem, boylam, qr_kod, olusturma_tarihi, aktif) values ('7', '1', 'NEŞE YÖNETİM', '', '38.76072181', '30.54604737', 'SAHA-8136CA4DBD', '2026-06-19 12:38:38', true);
