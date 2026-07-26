@@ -31,6 +31,9 @@ jobs:
   build:
     name: .aab derle ve yayınla
     runs-on: ubuntu-latest
+    env:
+      # step-level "if" içinde secrets bağlamı kullanılamaz; env üzerinden kontrol edilir
+      PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     defaults:
       run:
         working-directory: mobile
@@ -83,7 +86,7 @@ jobs:
           path: mobile/build/app/outputs/bundle/release/app-release.aab
 
       - name: Play internal test kanalına yükle
-        if: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        if: env.PLAY_JSON != ''
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
