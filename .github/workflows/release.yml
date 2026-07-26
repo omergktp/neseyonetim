@@ -1,0 +1,93 @@
+name: Android Release (.aab -> Play internal test)
+
+# Tetikleme:
+#   * "v" ile başlayan tag push'u  (örn: git tag v1.0.1 && git push origin v1.0.1)
+#   * Actions sekmesinden elle (workflow_dispatch)
+#
+# versionCode otomatik artar (GitHub run numarası) — pubspec'te elle
+# sayı yükseltmeye gerek yok. versionName pubspec'teki "version"dan gelir.
+#
+# Gerekli repo secret'ları (Settings > Secrets and variables > Actions):
+#   GOOGLE_SERVICES_JSON     Firebase'den indirilen google-services.json İÇERİĞİ
+#   KEYSTORE_BASE64          upload keystore'un base64'ü
+#                            (PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes("glow-saha-upload.jks")) | Set-Clipboard)
+#   KEYSTORE_PASSWORD        keystore şifresi
+#   KEY_ALIAS                anahtar takma adı (örn: upload)
+#   KEY_PASSWORD             anahtar şifresi
+#   PLAY_SERVICE_ACCOUNT_JSON  (opsiyonel) Play API servis hesabı JSON'u;
+#                            tanımlıysa .aab otomatik olarak Play "internal"
+#                            test kanalına yüklenir. Tanımlı değilse .aab
+#                            yalnız artifact olarak üretilir (elle yüklersin).
+#
+# NOT: İlk sürüm Play Console'a bir kez ELLE yüklenmelidir (yeni uygulama
+# API ile oluşturulamaz). Sonraki tüm sürümler bu workflow ile otomatiktir.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: .aab derle ve yayınla
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Secret kontrolü
+        env:
+          GS: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          KS: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          eksik=0
+          [ -z "$GS" ] && { echo "::error::GOOGLE_SERVICES_JSON secret'ı tanımlı değil."; eksik=1; }
+          [ -z "$KS" ] && { echo "::error::KEYSTORE_BASE64 secret'ı tanımlı değil."; eksik=1; }
+          exit $eksik
+
+      - name: google-services.json yaz
+        env:
+          GS: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GS" > android/app/google-services.json
+
+      - name: Keystore ve key.properties hazırla
+        env:
+          KS: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KS" | base64 -d > android/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=../upload-keystore.jks
+          EOF
+
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+
+      - name: App Bundle derle (.aab)
+        # versionCode = workflow çalıştırma numarası -> her sürümde otomatik artar
+        run: flutter build appbundle --release --build-number=${{ github.run_number }}
+
+      - name: .aab artifact olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: glow-saha-release-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+
+      - name: Play internal test kanalına yükle
+        if: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.glowsaha.app
+          releaseFiles: mobile/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed

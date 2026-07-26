@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -6,6 +9,15 @@ plugins {
     id("com.google.gms.google-services")
     // Crash raporlama (Firebase Crashlytics)
     id("com.google.firebase.crashlytics")
+}
+
+// Release imzalama anahtarı: android/key.properties (repo'ya girmez).
+// Dosya yoksa debug anahtarına düşülür ki `flutter run` çalışmaya devam etsin.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreVar = keystorePropertiesFile.exists()
+if (keystoreVar) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -19,21 +31,33 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.glow_saha"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Play Store paket kimliği. (namespace kod tarafında com.example kalabilir;
+        // mağazada görünen kimlik applicationId'dir ve com.example ile başlayamaz.)
+        applicationId = "com.glowsaha.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (keystoreVar) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // key.properties varsa gerçek upload anahtarıyla, yoksa debug ile imzala.
+            signingConfig = if (keystoreVar)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
 
             // İnternetsiz/pilot yapılarda Crashlytics eşleme (mapping) dosyasının
             // Firebase'e yüklenmesini kapatır; aksi halde build son adımda ağ hatası verir.

@@ -39,5 +39,5 @@ jobs:
           hata=0
           while IFS= read -r -d '' dosya; do
             php -l "$dosya" > /dev/null || { echo "SYNTAX HATASI: $dosya"; hata=1; }
-          done < <(find backend -name '*.php' -print0)
+          done < <(find web/backend -name '*.php' -print0)
           exit $hata
