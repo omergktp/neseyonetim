@@ -973,7 +973,8 @@
         // Seçili tesisi raporla aç (tesis bazlı rapor)
         function acAylikRapor() {
             const siteId = document.getElementById('dashboard-site-filter').value;
-            const url = siteId ? `rapor_pdf.html?site_id=${encodeURIComponent(siteId)}` : 'rapor_pdf.html';
+            // PANEL_KOK (api-supabase.js): cleanUrls altında her adres biçiminde doğru çözer.
+            const url = PANEL_KOK + (siteId ? `rapor_pdf.html?site_id=${encodeURIComponent(siteId)}` : 'rapor_pdf.html');
             window.open(url, '_blank');
         }
 

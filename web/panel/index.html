@@ -143,7 +143,13 @@
                     else localStorage.removeItem('glow_refresh');
                     localStorage.setItem('glow_user', JSON.stringify(data.kullanici));
                     if (data.firma) localStorage.setItem('glow_firma', JSON.stringify(data.firma));
-                    window.location.href = "dashboard.html";
+                    // Panel kökünü mevcut adresten hesapla: '/panel', '/panel/',
+                    // '/panel/index' ve '.html'li biçimlerin hepsinde doğru çalışır
+                    // (Vercel cleanUrls '/panel'de göreli linki köke çözüyordu -> 404).
+                    const panelKok = window.location.pathname
+                        .replace(/\/(index|dashboard|super)(\.html)?$/, '')
+                        .replace(/\/$/, '') + '/';
+                    window.location.href = panelKok + "dashboard.html";
                 } else {
                     hataGoster(data.message || "Giriş başarısız.");
                     btn.innerText = originalText;

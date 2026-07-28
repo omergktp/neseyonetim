@@ -13,10 +13,17 @@
 const SUPABASE_URL = 'https://bfkiifbzxwhbviluyzcp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HdcOSN5v1E4YBoQok996Mg_W1i1xnGx';
 
-let token = localStorage.getItem('glow_token');
-if (!token) { window.location.href = 'index.html'; }
+// Panel kökünü mevcut adresten hesapla: '/panel', '/panel/', '/panel/dashboard'
+// ve '.html'li biçimlerin hepsinde '/panel/' döner (Vercel cleanUrls, sondaki
+// eğik çizgisiz adreste göreli linki köke çözüyordu -> 404).
+const PANEL_KOK = window.location.pathname
+    .replace(/\/(index|dashboard|super|rapor_pdf)(\.html)?$/, '')
+    .replace(/\/$/, '') + '/';
 
-function _cikis() { localStorage.clear(); window.location.href = 'index.html'; }
+let token = localStorage.getItem('glow_token');
+if (!token) { window.location.href = PANEL_KOK + 'index.html'; }
+
+function _cikis() { localStorage.clear(); window.location.href = PANEL_KOK + 'index.html'; }
 
 // ---- Sessiz oturum yenileme (refresh_token) ----
 // 401 alınınca bir kez yenileme denenir ve istek tekrarlanır; yenileme de

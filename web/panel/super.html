@@ -276,7 +276,11 @@
                 else localStorage.removeItem('glow_refresh');
                 localStorage.setItem('glow_user', JSON.stringify(d.kullanici));
                 if (d.firma) localStorage.setItem('glow_firma', JSON.stringify(d.firma));
-                window.open('dashboard.html', '_blank');
+                // Panel kökünü mevcut adresten hesapla ('/panel/super' ve
+                // '/panel/super.html' biçimlerinin ikisinde de doğru çalışır).
+                const panelKok = window.location.pathname
+                    .replace(/\/super(\.html)?$/, '') + '/';
+                window.open(panelKok + 'dashboard.html', '_blank');
             } catch (e) { mesaj(e.message, true); }
         }
 
