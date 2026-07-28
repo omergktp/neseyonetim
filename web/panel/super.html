@@ -81,6 +81,15 @@
                     <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Adı</label>
                     <input id="f-ad" class="alan" placeholder="Örn: Neşe Yönetim">
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Logosu</label>
+                    <div class="flex items-center gap-3">
+                        <div id="f-logo-onizleme" class="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden text-white/25 text-[11px] shrink-0">Yok</div>
+                        <input id="f-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                               class="block w-full text-xs text-white/50 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-xs file:font-semibold file:cursor-pointer hover:file:bg-white/15">
+                    </div>
+                    <p class="text-[11px] text-white/30 mt-1.5">PNG/JPG/WebP/SVG, en fazla 2 MB. Firma sahibi girişte uygulamayı kendi logosuyla görür.</p>
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Kodu</label>
@@ -120,6 +129,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Kart üzerinden logo değiştirme için gizli dosya seçici -->
+    <input id="logo-degistir-dosya" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
 
     <script>
         // Supabase bağlantısı (api-supabase.js ile aynı proje)
@@ -212,12 +224,18 @@
                             <span>${f.site_sayisi} tesis</span>
                             <span class="ml-auto">${esc(tarih)}</span>
                         </div>
-                        <button onclick="durumDegistir(${Number(f.id)}, ${f.aktif ? 'false' : 'true'}, '${esc(f.ad).replace(/'/g, "\\'")}')"
-                                class="w-full py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
-                                    ? 'border-red-500/30 text-red-300 hover:bg-red-500/10'
-                                    : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'}">
-                            ${f.aktif ? 'Pasifleştir (girişleri kapat)' : 'Aktifleştir'}
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="logoSec(${Number(f.id)})"
+                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
+                                ${logoUrl ? 'Logoyu Değiştir' : 'Logo Yükle'}
+                            </button>
+                            <button onclick="durumDegistir(${Number(f.id)}, ${f.aktif ? 'false' : 'true'}, '${esc(f.ad).replace(/'/g, "\\'")}')"
+                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
+                                        ? 'border-red-500/30 text-red-300 hover:bg-red-500/10'
+                                        : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'}">
+                                ${f.aktif ? 'Pasifleştir' : 'Aktifleştir'}
+                            </button>
+                        </div>
                     </div>`;
                 }).join('');
             } catch (e) {
@@ -236,6 +254,61 @@
                 firmalariYukle();
             } catch (e) { mesaj(e.message, true); }
         }
+
+        // ---- Logo yardımcıları ----
+        // Seçilen dosyayı doğrulayıp {base64, tip} olarak okur (2 MB sınırı).
+        function logoOku(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) return resolve(null);
+                if (file.size > 2 * 1024 * 1024) return reject(new Error('Logo en fazla 2 MB olabilir.'));
+                const okuyucu = new FileReader();
+                okuyucu.onload = () => resolve({ base64: okuyucu.result, tip: file.type });
+                okuyucu.onerror = () => reject(new Error('Logo dosyası okunamadı.'));
+                okuyucu.readAsDataURL(file);
+            });
+        }
+
+        // Yeni firma modalındaki logo seçimi + önizleme
+        let _yeniLogo = null; // {base64, tip}
+        $('f-logo').addEventListener('change', async (e) => {
+            const kutu = $('f-logo-onizleme');
+            try {
+                _yeniLogo = await logoOku(e.target.files[0]);
+                kutu.innerHTML = _yeniLogo
+                    ? `<img src="${_yeniLogo.base64}" class="w-full h-full object-contain bg-white" alt="logo">`
+                    : 'Yok';
+            } catch (hata) {
+                _yeniLogo = null; e.target.value = ''; kutu.textContent = 'Yok';
+                const kutuH = $('modal-hata');
+                kutuH.textContent = hata.message; kutuH.classList.remove('hidden');
+            }
+        });
+
+        // Mevcut firmaya logo yükleme/değiştirme (kartlardaki buton)
+        let _logoHedefFirma = null;
+        function logoSec(firmaId) {
+            _logoHedefFirma = firmaId;
+            $('logo-degistir-dosya').value = '';
+            $('logo-degistir-dosya').click();
+        }
+        $('logo-degistir-dosya').addEventListener('change', async (e) => {
+            if (!_logoHedefFirma || !e.target.files[0]) return;
+            try {
+                const logo = await logoOku(e.target.files[0]);
+                const d = await istek({
+                    islem: 'logo',
+                    firma_id: _logoHedefFirma,
+                    logo_base64: logo.base64,
+                    logo_tip: logo.tip,
+                });
+                mesaj(d.message, false);
+                firmalariYukle();
+            } catch (hata) {
+                mesaj(hata.message, true);
+            } finally {
+                _logoHedefFirma = null;
+            }
+        });
 
         // ---- Yeni firma ----
         function modalAc() { $('modal').classList.remove('hidden'); $('modal-hata').classList.add('hidden'); }
@@ -256,12 +329,19 @@
                 telefon: $('f-tel').value.trim(),
                 sifre: $('f-sifre').value,
             };
+            if (_yeniLogo) {
+                govde.logo_base64 = _yeniLogo.base64;
+                govde.logo_tip = _yeniLogo.tip;
+            }
             btn.disabled = true; btn.textContent = 'KURULUYOR…';
             try {
                 const d = await istek(govde);
                 modalKapat();
-                mesaj(`${d.message} "${govde.ad}" (${govde.firma_kodu}) — yönetici artık giriş yapabilir.`, false);
-                ['f-ad', 'f-kod', 'f-yonetici', 'f-tel', 'f-sifre'].forEach((id) => { $(id).value = ''; });
+                if (d.logo_uyari) mesaj(d.logo_uyari, true);
+                else mesaj(`${d.message} "${govde.ad}" (${govde.firma_kodu}) — yönetici artık giriş yapabilir.`, false);
+                ['f-ad', 'f-kod', 'f-yonetici', 'f-tel', 'f-sifre', 'f-logo'].forEach((id) => { $(id).value = ''; });
+                _yeniLogo = null;
+                $('f-logo-onizleme').textContent = 'Yok';
                 firmalariYukle();
             } catch (e) {
                 const kutu = $('modal-hata');

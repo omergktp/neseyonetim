@@ -12,7 +12,10 @@
 //
 // İşlemler (POST JSON):
 //   { islem: "listele" }
-//   { islem: "kur", firma_kodu, ad, hex_color, yonetici_ad, telefon, sifre }
+//   { islem: "kur", firma_kodu, ad, hex_color, yonetici_ad, telefon, sifre,
+//     logo_base64?, logo_tip? }            — logo süper admin tarafından yüklenir
+//   { islem: "logo", firma_id, logo_base64, logo_tip }   — logo yükle/değiştir
+//   { islem: "logo", firma_id, kaldir: true }            — logoyu kaldır
 //   { islem: "durum", firma_id, aktif }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -45,6 +48,36 @@ async function anahtarDogru(verilen: string, beklenen: string): Promise<boolean>
   let fark = 0;
   for (let i = 0; i < av.length; i++) fark |= av[i] ^ bv[i];
   return fark === 0;
+}
+
+// İzin verilen logo türleri -> dosya uzantısı.
+const MIME_UZANTI: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
+
+// Logoyu firma-logo bucket'ına yükler; DB'de saklanacak "firma-logo/{id}/..."
+// yolunu döndürür (login fonksiyonu bu yolu public URL'e çevirir).
+// deno-lint-ignore no-explicit-any
+async function logoYukle(admin: any, firmaId: number, base64: string, tip: string): Promise<string> {
+  const uzanti = MIME_UZANTI[tip];
+  if (!uzanti) throw new Error("Logo PNG, JPEG, WebP veya SVG olmalı.");
+  const temiz = base64.replace(/^data:[^;]+;base64,/, "");
+  let bytes: Uint8Array;
+  try {
+    bytes = Uint8Array.from(atob(temiz), (c) => c.charCodeAt(0));
+  } catch {
+    throw new Error("Logo verisi çözümlenemedi.");
+  }
+  if (bytes.length === 0) throw new Error("Logo dosyası boş.");
+  if (bytes.length > 2 * 1024 * 1024) throw new Error("Logo en fazla 2 MB olabilir.");
+  const yol = `${firmaId}/logo_${Date.now()}.${uzanti}`;
+  const { error } = await admin.storage.from("firma-logo")
+    .upload(yol, bytes, { contentType: tip, upsert: true });
+  if (error) throw new Error("Logo Storage'a yüklenemedi.");
+  return `firma-logo/${yol}`;
 }
 
 Deno.serve(async (req) => {
@@ -164,10 +197,49 @@ Deno.serve(async (req) => {
       return json({ message: "Yönetici hesabı oluşturulamadı, kurulum geri alındı." }, 500);
     }
 
+    // 3) Logo (opsiyonel; süper admin yükler — firma sahibi girişte hazır bulur).
+    //    Logo hatası kurulumu bozmaz: firma açılır, uyarıyla dönülür.
+    let logoUyari: string | null = null;
+    const logoBase64 = (body.logo_base64 ?? "").toString();
+    if (logoBase64) {
+      try {
+        const yol = await logoYukle(admin, firma.id, logoBase64, (body.logo_tip ?? "").toString());
+        await admin.from("firmalar").update({ logo: yol }).eq("id", firma.id);
+      } catch (e) {
+        logoUyari = `Firma kuruldu ama logo yüklenemedi: ${(e as Error).message}`;
+      }
+    }
+
     return json({
       message: "Firma kuruldu.",
+      logo_uyari: logoUyari,
       firma: { id: firma.id, firma_kodu: firmaKodu, ad, hex_color: renk },
     });
+  }
+
+  // ---------------- LOGO (yükle / değiştir / kaldır) ----------------
+  if (islem === "logo") {
+    const firmaId = Number(body.firma_id);
+    if (!Number.isInteger(firmaId) || firmaId <= 0) {
+      return json({ message: "Geçersiz firma_id." }, 422);
+    }
+    if (body.kaldir === true) {
+      const { error } = await admin.from("firmalar").update({ logo: null }).eq("id", firmaId);
+      if (error) return json({ message: "Logo kaldırılamadı." }, 500);
+      return json({ message: "Logo kaldırıldı." });
+    }
+    try {
+      const yol = await logoYukle(
+        admin, firmaId,
+        (body.logo_base64 ?? "").toString(),
+        (body.logo_tip ?? "").toString(),
+      );
+      const { error } = await admin.from("firmalar").update({ logo: yol }).eq("id", firmaId);
+      if (error) return json({ message: "Logo kaydedilemedi." }, 500);
+      return json({ message: "Logo yüklendi.", logo: yol });
+    } catch (e) {
+      return json({ message: (e as Error).message }, 422);
+    }
   }
 
   // ---------------- DURUM (aktif / pasif) ----------------
