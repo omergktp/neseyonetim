@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:glow_saha/services/api_service.dart';
+import 'package:blokent/services/api_service.dart';
 
 /// İmzası önemsiz (isTokenValid imza doğrulamaz, yalnızca exp'e bakar) bir JWT üretir.
 String sahteJwt({int? exp}) {

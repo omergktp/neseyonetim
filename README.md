@@ -1,4 +1,4 @@
-# GLOW SAHA - Test ve Kurulum Rehberi
+# BLOKENT - Test ve Kurulum Rehberi
 
 Projemiz üç ana bileşenden oluşmaktadır: **PHP/MySQL Backend**, **Web Paneli (Frontend)** ve **Flutter Mobil Uygulaması**. Projeyi bilgisayarınızda test etmek için aşağıdaki adımları sırasıyla uygulayabilirsiniz.
 

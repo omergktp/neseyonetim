@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// GLOW SAHA marka logosu — TEK reçete (login, splash ve web ile aynı):
+/// BLOKENT marka logosu — TEK reçete (login, splash ve web ile aynı):
 /// gradyan #3B82F6 → #8B5CF6, köşe = genişliğin %26'sı, mor gölge.
 /// Logoyu başka yerde elle çizme; her zaman bu widget'ı kullan.
+/// Not: Tasarımcıdan SVG logo gelince harf yerine gerçek "b" işareti konacak.
 ///
-/// [logoUrl] verilirse (girişte kaydedilen firma logosu) gradyan "G" yerine
-/// firma logosu gösterilir; yükleme başarısız olursa "G"ye geri düşülür.
+/// [logoUrl] verilirse (girişte kaydedilen firma logosu) gradyan "b" yerine
+/// firma logosu gösterilir; yükleme başarısız olursa "b"ye geri düşülür.
 class BrandLogo extends StatelessWidget {
   final double size;
   final String? logoUrl;
@@ -55,11 +56,12 @@ class BrandLogo extends StatelessWidget {
   Widget _harf(Color renk) {
     return Center(
       child: Text(
-        'G',
+        'b',
         style: GoogleFonts.plusJakartaSans(
           color: renk,
-          fontSize: size * 0.52,
+          fontSize: size * 0.58,
           fontWeight: FontWeight.w800,
+          height: 1.0,
         ),
       ),
     );

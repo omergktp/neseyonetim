@@ -133,7 +133,7 @@ class _SplashScreenState extends State<SplashScreen> {
         children: [
           BrandLogo(size: 84, logoUrl: _firmaLogoUrl),
           const SizedBox(height: 22),
-          Text((_firmaAd ?? 'GLOW SAHA').toUpperCase(),
+          Text((_firmaAd ?? 'BLOKENT').toUpperCase(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                   color: Colors.white,
@@ -141,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5)),
           const SizedBox(height: 6),
-          Text(_firmaAd == null ? 'Tesis ve Saha Yönetim Sistemi' : 'Glow Saha · Tesis ve Saha Yönetimi',
+          Text(_firmaAd == null ? 'Site ve Tesis Yönetim Platformu' : 'Blokent · Site ve Tesis Yönetimi',
               style: const TextStyle(color: Colors.white38, fontSize: 13)),
           const SizedBox(height: 36),
           const SizedBox(

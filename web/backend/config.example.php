@@ -17,7 +17,7 @@ define('JWT_SECRET', 'BURAYA-UZUN-RASTGELE-BIR-ANAHTAR-YAZIN'); // ör: bin2hex(
 // --- Mobil Uygulama Sürüm Kontrolü (Zorunlu Güncelleme) ---
 define('MIN_APP_VERSION', '1.0.0');     // Çalışmaya izin verilen en düşük sürüm
 define('LATEST_APP_VERSION', '1.0.0');  // Mağazadaki güncel sürüm
-define('APP_STORE_URL', 'https://play.google.com/store/apps/details?id=com.example.glow_saha');
+define('APP_STORE_URL', 'https://play.google.com/store/apps/details?id=com.blokent.app');
 
 // --- FCM (Firebase Cloud Messaging) - HTTP v1 API ---
 define('FCM_PROJECT_ID', 'PROJE-KIMLIGINIZ');

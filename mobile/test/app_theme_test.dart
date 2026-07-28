@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glow_saha/theme/app_theme.dart';
+import 'package:blokent/theme/app_theme.dart';
 
 void main() {
   group('AppTheme.parseHex', () {

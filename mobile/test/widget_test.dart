@@ -1,10 +1,10 @@
-// Glow Saha temel smoke test'i.
+// Blokent temel smoke test'i.
 // Uygulamanın hatasız kurulup açılış (Splash) ekranını çizebildiğini doğrular.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:glow_saha/main.dart';
+import 'package:blokent/main.dart';
 
 void main() {
   testWidgets('Uygulama açılışta hatasız kurulur', (WidgetTester tester) async {

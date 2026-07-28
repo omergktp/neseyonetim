@@ -2,9 +2,9 @@
 # key.properties .gitignore'dadır; ASLA commit etme.
 #
 # Keystore üretimi (bir kez):
-#   keytool -genkey -v -keystore %USERPROFILE%\glow-saha-upload.jks ^
+#   keytool -genkey -v -keystore %USERPROFILE%\blokent-upload.jks ^
 #     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 storePassword=KEYSTORE_SIFRESI
 keyPassword=ANAHTAR_SIFRESI
 keyAlias=upload
-storeFile=C:/Users/omerg/glow-saha-upload.jks
+storeFile=C:/Users/omerg/blokent-upload.jks

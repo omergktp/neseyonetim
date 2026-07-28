@@ -434,7 +434,7 @@ Deno.serve(async (req) => {
     let email: string | null = null;
 
     if (!authUserId) {
-      email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
+      email = `p-${crypto.randomUUID()}@personel.blokent.app`;
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email,
         email_confirm: true,

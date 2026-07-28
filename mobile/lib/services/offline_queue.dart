@@ -26,6 +26,8 @@ class OfflineQueue {
   }
 
   static Future<Database> _initDB() async {
+    // Dosya adı Blokent'e ÇEVRİLMEZ: sahadaki cihazlarda bu dosyada gönderilmeyi
+    // bekleyen kayıtlar var; ad değişirse kuyruk erişilemez olur (veri kaybı).
     String path = join(await getDatabasesPath(), 'glow_saha_queue.db');
     return await openDatabase(
       path,

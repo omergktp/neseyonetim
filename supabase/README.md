@@ -1,6 +1,6 @@
 # Supabase Geçişi — Kurulum ve Uygulama Kılavuzu
 
-Proje: **Neşe Yönetim** (glow_saha) — PHP+MySQL → **Supabase (Postgres + RLS + Edge Functions + Realtime + Storage)**
+Proje: **Blokent** (eski ad: Glow Saha) — PHP+MySQL → **Supabase (Postgres + RLS + Edge Functions + Realtime + Storage)**
 
 Yaklaşım: **Tam Supabase-native.** PHP backend kalkar; Flutter uygulaması doğrudan Supabase'e bağlanır. Giriş korunuyor (firma kodu + telefon + şifre) — bir Edge Function doğrulayıp Supabase-uyumlu JWT üretir, RLS `firma_id` claim'iyle izolasyonu zorlar.
 

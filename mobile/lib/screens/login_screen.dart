@@ -229,15 +229,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      (_firmaAd ?? 'GLOW SAHA').toUpperCase(),
+                      (_firmaAd ?? 'BLOKENT').toUpperCase(),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _firmaAd == null
-                          ? 'Tesis ve Saha Yönetim Sistemi'
-                          : 'Glow Saha · Tesis ve Saha Yönetimi',
+                          ? 'Site ve Tesis Yönetim Platformu'
+                          : 'Blokent · Site ve Tesis Yönetimi',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 15, letterSpacing: 0.5),
                     ),
                     const SizedBox(height: 48),

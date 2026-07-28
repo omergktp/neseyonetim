@@ -1,6 +1,6 @@
 {
-    "name": "glow_saha",
-    "short_name": "glow_saha",
+    "name": "blokent",
+    "short_name": "blokent",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

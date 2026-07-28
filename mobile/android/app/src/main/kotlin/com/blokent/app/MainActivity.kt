@@ -1,4 +1,4 @@
-package com.example.glow_saha
+package com.blokent.app
 
 import io.flutter.embedding.android.FlutterActivity
 

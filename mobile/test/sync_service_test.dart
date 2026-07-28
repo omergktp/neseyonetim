@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:glow_saha/services/offline_queue.dart';
-import 'package:glow_saha/services/sync_service.dart';
+import 'package:blokent/services/offline_queue.dart';
+import 'package:blokent/services/sync_service.dart';
 
 /// flushQueue'nun kritik sözleşmesini test eder:
 /// 'ok' -> silinir ve sayılır; 'rejected' -> silinir ama sayılmaz;

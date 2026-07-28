@@ -21,7 +21,7 @@ if (keystoreVar) {
 }
 
 android {
-    namespace = "com.example.glow_saha"
+    namespace = "com.blokent.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,9 +31,8 @@ android {
     }
 
     defaultConfig {
-        // Play Store paket kimliği. (namespace kod tarafında com.example kalabilir;
-        // mağazada görünen kimlik applicationId'dir ve com.example ile başlayamaz.)
-        applicationId = "com.glowsaha.app"
+        // Play Store paket kimliği. Yayın SONRASI asla değiştirilemez.
+        applicationId = "com.blokent.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

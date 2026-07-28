@@ -10,7 +10,7 @@ name: Android Release (.aab -> Play internal test)
 # Gerekli repo secret'ları (Settings > Secrets and variables > Actions):
 #   GOOGLE_SERVICES_JSON     Firebase'den indirilen google-services.json İÇERİĞİ
 #   KEYSTORE_BASE64          upload keystore'un base64'ü
-#                            (PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes("glow-saha-upload.jks")) | Set-Clipboard)
+#                            (PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes("blokent-upload.jks")) | Set-Clipboard)
 #   KEYSTORE_PASSWORD        keystore şifresi
 #   KEY_ALIAS                anahtar takma adı (örn: upload)
 #   KEY_PASSWORD             anahtar şifresi
@@ -83,7 +83,7 @@ jobs:
       - name: .aab artifact olarak sakla
         uses: actions/upload-artifact@v4
         with:
-          name: glow-saha-release-aab
+          name: blokent-release-aab
           path: mobile/build/app/outputs/bundle/release/app-release.aab
 
       - name: Play internal test kanalına yükle
@@ -91,7 +91,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.glowsaha.app
+          packageName: com.blokent.app
           releaseFiles: mobile/build/app/outputs/bundle/release/app-release.aab
           track: internal
           status: completed

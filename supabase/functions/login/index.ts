@@ -12,7 +12,7 @@
 //  * Numaralandırma oracle'ı kapalı: firma yok / kullanıcı yok / şifre yanlış
 //    ayrımı yapılmaz — tek tip 401. Kullanıcı bulunamadığında da sahte bcrypt
 //    karşılaştırması yapılır (zamanlama farkı sızdırmaz).
-//  * Gölge e-posta tahmin edilemez: p-<rastgele-uuid>@personel.glowsaha.app.
+//  * Gölge e-posta tahmin edilemez: p-<rastgele-uuid>@personel.blokent.app.
 //    Eski öngörülebilir (p<id>@...) adresler ilk girişte rastgeleye taşınır.
 //  * createUser hatasında e-postayla kullanıcı devralma (generateLink fallback)
 //    KALDIRILDI — "ilk kullanımda güven" açığıydı.
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
 
   if (!authUserId) {
     // Yeni köprü kullanıcısı: tahmin edilemez rastgele e-posta.
-    email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
+    email = `p-${crypto.randomUUID()}@personel.blokent.app`;
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     email = mevcut.user.email ?? null;
     // Eski öngörülebilir adresleri (p<id>@...) rastgeleye taşı.
     if (!email || /^p\d+@/.test(email)) {
-      email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
+      email = `p-${crypto.randomUUID()}@personel.blokent.app`;
       const { error: eErr } = await admin.auth.admin.updateUserById(authUserId, {
         email,
         email_confirm: true,

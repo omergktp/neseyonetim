@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:glow_saha/services/offline_queue.dart';
+import 'package:blokent/services/offline_queue.dart';
 
 void main() {
   // sqflite'ı test VM'inde (masaüstü) çalıştır

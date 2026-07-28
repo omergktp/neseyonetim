@@ -1,4 +1,4 @@
-# PROJE DOSYASI: GLOW SAHA (SaaS Tesis ve Saha Yönetim Sistemi)
+# PROJE DOSYASI: BLOKENT (SaaS Tesis ve Saha Yönetim Sistemi)
 
 ## 1. PROJE ÖZETİ VE MİMARİ
 Bu proje, tesis ve apartman yönetim şirketlerinin sahadaki temizlik ve teknik personellerini takip etmesini, iş atamasını ve raporlamasını sağlayan Çoklu Müşteri (Multi-Tenant) yapısına sahip bir SaaS yazılımıdır. 

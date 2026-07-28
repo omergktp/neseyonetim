@@ -1,5 +1,5 @@
-# GLOW SAHA - Gunluk MySQL yedegi
-# Zamanlanmis gorev "GlowSaha DB Yedek" tarafindan her gece calistirilir.
+# BLOKENT - Gunluk MySQL yedegi
+# Zamanlanmis gorev "Blokent DB Yedek" tarafindan her gece calistirilir.
 # Yedekler db\backups altina tarih damgali yazilir; 14 gunden eskiler silinir.
 
 $ErrorActionPreference = 'Stop'
