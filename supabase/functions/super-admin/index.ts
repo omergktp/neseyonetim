@@ -3,8 +3,12 @@
 // SÜPER ADMİN ucu: platform sahibinin (firmaların değil!) firma açma /
 // listeleme / aktif-pasif yönetimi. web/panel/super.html bu ucu çağırır.
 //
-// Kimlik doğrulama: "x-super-key" başlığı, Supabase secret'ı SUPER_ADMIN_KEY
-// ile sabit-zamanlı karşılaştırılır. Anahtar repo'da TUTULMAZ; kurulum:
+// Kimlik doğrulama (iki yol):
+//   1) E-posta oturumu: GoTrue'da app_metadata.is_super_admin=true işaretli
+//      kullanıcının access token'ı Authorization: Bearer ile gelir (panel bunu
+//      kullanır — e-posta + şifre girişi, oturum yenileme, şifre değiştirme).
+//   2) "x-super-key" başlığı: SUPER_ADMIN_KEY secret'ı ile sabit-zamanlı
+//      karşılaştırma (CLI/kurtarma yolu ve süper admin hesabı kurulumu).
 //   supabase secrets set SUPER_ADMIN_KEY="uzun-rastgele-anahtar"
 //
 // Kaba kuvvet koruması: yanlış anahtar denemeleri login_guard RPC'sinden
@@ -115,9 +119,27 @@ Deno.serve(async (req) => {
   }
 
   const verilenAnahtar = req.headers.get("x-super-key") ?? "";
-  if (!(await anahtarDogru(verilenAnahtar, beklenenAnahtar))) {
-    await guard("hata");
-    return json({ message: "Yetkisiz." }, 401);
+  let anahtarla = false; // super_hesap işlemi yalnız anahtarla yapılabilir
+
+  if (verilenAnahtar) {
+    // Yol 2: paylaşılan anahtar (CLI / kurtarma / hesap kurulumu)
+    if (!(await anahtarDogru(verilenAnahtar, beklenenAnahtar))) {
+      await guard("hata");
+      return json({ message: "Yetkisiz." }, 401);
+    }
+    anahtarla = true;
+  } else {
+    // Yol 1: süper admin e-posta oturumu (Bearer JWT + is_super_admin claim'i)
+    const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    let superKullanici = false;
+    if (jwt) {
+      const { data } = await admin.auth.getUser(jwt);
+      superKullanici = data?.user?.app_metadata?.is_super_admin === true;
+    }
+    if (!superKullanici) {
+      await guard("hata");
+      return json({ message: "Yetkisiz. Süper admin girişi gerekli." }, 401);
+    }
   }
   await guard("basari");
 
@@ -129,6 +151,47 @@ Deno.serve(async (req) => {
   }
 
   const islem = (body.islem ?? "").toString();
+
+  // ---------------- SÜPER HESAP (e-posta girişi kur/güncelle) ----------------
+  // Yalnız x-super-key ile çağrılabilir: süper admin GoTrue kullanıcısını
+  // oluşturur veya şifresini günceller (is_super_admin işareti burada basılır).
+  if (islem === "super_hesap") {
+    if (!anahtarla) {
+      return json({ message: "Bu işlem yalnız süper admin anahtarıyla yapılabilir." }, 403);
+    }
+    const email = (body.email ?? "").toString().trim().toLowerCase();
+    const sifre = (body.sifre ?? "").toString();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return json({ message: "Geçerli bir e-posta girin." }, 422);
+    }
+    if (sifre.length < 10) return json({ message: "Şifre en az 10 karakter olmalı." }, 422);
+
+    // Aynı e-postayla kullanıcı var mı? (listUsers e-posta filtresiz gelir;
+    // küçük kurulumlarda ilk sayfada aranması yeterli)
+    const { data: liste } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const mevcut = (liste?.users ?? []).find(
+      (u: { email?: string }) => (u.email ?? "").toLowerCase() === email,
+    );
+
+    if (mevcut) {
+      const { error } = await admin.auth.admin.updateUserById(mevcut.id, {
+        password: sifre,
+        email_confirm: true,
+        app_metadata: { ...(mevcut.app_metadata ?? {}), is_super_admin: true },
+      });
+      if (error) return json({ message: "Hesap güncellenemedi." }, 500);
+      return json({ message: `Süper admin hesabı güncellendi: ${email}` });
+    }
+
+    const { error } = await admin.auth.admin.createUser({
+      email,
+      password: sifre,
+      email_confirm: true,
+      app_metadata: { is_super_admin: true },
+    });
+    if (error) return json({ message: "Hesap oluşturulamadı." }, 500);
+    return json({ message: `Süper admin hesabı oluşturuldu: ${email}` });
+  }
 
   // ---------------- LİSTELE ----------------
   if (islem === "listele") {

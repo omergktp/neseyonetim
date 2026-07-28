@@ -28,18 +28,20 @@
         <div class="absolute -bottom-32 -right-24 w-[28rem] h-[28rem] bg-purple-500/25 rounded-full blur-3xl animate-blob" style="animation-delay:3s"></div>
     </div>
 
-    <!-- ============ 1) ANAHTAR EKRANI ============ -->
+    <!-- ============ 1) GİRİŞ EKRANI (e-posta + şifre) ============ -->
     <div id="ekran-anahtar" class="relative min-h-screen flex items-center justify-center p-6">
         <div class="cam rounded-3xl p-8 w-full max-w-md shadow-2xl">
             <div class="marka-gradyan w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-extrabold mb-5 shadow-lg shadow-indigo-500/30">G</div>
-            <h1 class="text-xl font-bold mb-1">Süper Admin</h1>
+            <h1 class="text-xl font-bold mb-1">Süper Admin Girişi</h1>
             <p class="text-sm text-white/50 mb-6">Firma açma ve yönetim ekranı. Bu alan yalnızca platform sahibine aittir.</p>
             <div id="anahtar-hata" class="hidden mb-4 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-sm text-red-300"></div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Süper Admin Anahtarı</label>
-            <input id="anahtar" type="password" class="alan mb-5" placeholder="••••••••••••••••" autocomplete="off">
-            <button onclick="anahtarGiris()" id="anahtar-btn"
+            <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">E-posta</label>
+            <input id="giris-email" type="email" class="alan mb-4" placeholder="ornek@mail.com" autocomplete="username">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Şifre</label>
+            <input id="giris-sifre" type="password" class="alan mb-5" placeholder="••••••••••" autocomplete="current-password">
+            <button onclick="girisYap()" id="anahtar-btn"
                     class="marka-gradyan w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">
-                DEVAM ET
+                GİRİŞ YAP
             </button>
         </div>
     </div>
@@ -56,6 +58,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="firmalariYukle()" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition">Yenile</button>
+                <button onclick="sifremiDegistir()" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition text-white/70">Şifrem</button>
                 <button onclick="modalAc()" class="marka-gradyan px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">+ Yeni Firma</button>
                 <button onclick="cikis()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-white/50 hover:text-white bg-white/5 border border-white/10 transition">Çıkış</button>
             </div>
@@ -196,54 +199,108 @@
         const SUPABASE_KEY = 'sb_publishable_HdcOSN5v1E4YBoQok996Mg_W1i1xnGx';
         const UC = `${SUPABASE_URL}/functions/v1/super-admin`;
 
-        // Anahtar yalnızca bu sekmenin ömrü boyunca tutulur (sessionStorage).
-        let superKey = sessionStorage.getItem('super_key') || '';
+        // Oturum yalnızca bu sekmenin ömrü boyunca tutulur (sessionStorage).
+        let superOturum = null;
+        try { superOturum = JSON.parse(sessionStorage.getItem('super_oturum') || 'null'); } catch (_) {}
 
         const $ = (id) => document.getElementById(id);
         function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
 
+        // Süreleri dolan access token'ı refresh token ile sessizce yenile.
+        async function _oturumYenile() {
+            if (!superOturum || !superOturum.refresh_token) return false;
+            try {
+                const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_token: superOturum.refresh_token }),
+                });
+                if (!res.ok) return false;
+                const d = await res.json();
+                if (!d.access_token) return false;
+                superOturum = { access_token: d.access_token, refresh_token: d.refresh_token || superOturum.refresh_token };
+                sessionStorage.setItem('super_oturum', JSON.stringify(superOturum));
+                return true;
+            } catch (_) { return false; }
+        }
+
         async function istek(govde) {
-            const res = await fetch(UC, {
+            const gonder = () => fetch(UC, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'x-super-key': superKey,
+                    'Authorization': `Bearer ${superOturum ? superOturum.access_token : SUPABASE_KEY}`,
                 },
                 body: JSON.stringify(govde),
             });
+            let res = await gonder();
+            if (res.status === 401 && await _oturumYenile()) res = await gonder();
             const d = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(d.message || `Hata (${res.status})`);
             return d;
         }
 
-        // ---- Anahtar ekranı ----
-        async function anahtarGiris() {
+        // ---- Giriş ekranı (e-posta + şifre; GoTrue password grant) ----
+        async function girisYap() {
             const btn = $('anahtar-btn');
-            superKey = $('anahtar').value.trim();
-            if (!superKey) return;
-            btn.disabled = true; btn.textContent = 'KONTROL EDİLİYOR…';
+            const email = $('giris-email').value.trim();
+            const sifre = $('giris-sifre').value;
+            if (!email || !sifre) return;
+            btn.disabled = true; btn.textContent = 'GİRİŞ YAPILIYOR…';
             try {
+                const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: sifre }),
+                });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok || !d.access_token) {
+                    throw new Error('E-posta veya şifre hatalı.');
+                }
+                superOturum = { access_token: d.access_token, refresh_token: d.refresh_token || null };
+                sessionStorage.setItem('super_oturum', JSON.stringify(superOturum));
+                // Yetki kontrolü: hesap süper admin değilse fonksiyon 401 döner.
                 await istek({ islem: 'listele' });
-                sessionStorage.setItem('super_key', superKey);
                 $('ekran-anahtar').classList.add('hidden');
                 $('ekran-panel').classList.remove('hidden');
                 firmalariYukle();
             } catch (e) {
+                superOturum = null;
+                sessionStorage.removeItem('super_oturum');
                 const kutu = $('anahtar-hata');
                 kutu.textContent = e.message;
                 kutu.classList.remove('hidden');
             } finally {
-                btn.disabled = false; btn.textContent = 'DEVAM ET';
+                btn.disabled = false; btn.textContent = 'GİRİŞ YAP';
             }
         }
-        $('anahtar').addEventListener('keydown', (e) => { if (e.key === 'Enter') anahtarGiris(); });
+        $('giris-sifre').addEventListener('keydown', (e) => { if (e.key === 'Enter') girisYap(); });
 
         function cikis() {
-            sessionStorage.removeItem('super_key');
-            superKey = '';
+            sessionStorage.removeItem('super_oturum');
+            superOturum = null;
             location.reload();
+        }
+
+        // ---- Kendi şifreni değiştir (GoTrue user update) ----
+        async function sifremiDegistir() {
+            const yeni = window.prompt('Yeni şifren (en az 10 karakter):');
+            if (yeni === null) return;
+            if (yeni.length < 10) { mesaj('Şifre en az 10 karakter olmalı.', true); return; }
+            try {
+                const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+                    method: 'PUT',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${superOturum ? superOturum.access_token : ''}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: yeni }),
+                });
+                if (!res.ok) throw new Error('Şifre değiştirilemedi.');
+                mesaj('Şifren güncellendi. Bir sonraki girişte yeni şifreni kullan.', false);
+            } catch (e) { mesaj(e.message, true); }
         }
 
         // ---- Firma listesi ----
@@ -585,8 +642,8 @@
             setTimeout(() => kutu.classList.add('hidden'), 6000);
         }
 
-        // Sayfa açılışı: kayıtlı anahtar varsa doğrudan panele geç.
-        if (superKey) {
+        // Sayfa açılışı: bu sekmede oturum varsa doğrudan panele geç.
+        if (superOturum) {
             $('ekran-anahtar').classList.add('hidden');
             $('ekran-panel').classList.remove('hidden');
             firmalariYukle();
