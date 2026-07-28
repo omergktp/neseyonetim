@@ -111,6 +111,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         keyboardType: type,
         style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
+          // Genel temadaki beyaz dolgu (filled: true) burada cam tasarımın
+          // üstünü kapatıp beyaz yazıyı görünmez yapıyor; bu ekranda dolgu yok.
+          filled: false,
           hintText: label,
           hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
           helperText: helperText,
