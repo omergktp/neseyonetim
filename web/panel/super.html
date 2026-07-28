@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glow Saha — Süper Admin</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233B82F6'/%3E%3Cstop offset='1' stop-color='%238B5CF6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='44' font-family='Arial,sans-serif' font-size='34' font-weight='800' fill='white' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --marka-1: #3B82F6; --marka-2: #8B5CF6; }
+        body { font-family: 'Inter', sans-serif; }
+        .marka-gradyan { background: linear-gradient(135deg, var(--marka-1), var(--marka-2)); }
+        .cam { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .alan { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(255,255,255,.06);
+                border: 1px solid rgba(255,255,255,.12); color: #fff; outline: none; font-size: 14px; }
+        .alan::placeholder { color: rgba(255,255,255,.35); }
+        .alan:focus { border-color: var(--marka-1); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+        @keyframes blob { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-40px) scale(1.1); } }
+        .animate-blob { animation: blob 7s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+    <!-- Arka plan ışıltıları -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-32 -left-24 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-blob"></div>
+        <div class="absolute -bottom-32 -right-24 w-[28rem] h-[28rem] bg-purple-500/25 rounded-full blur-3xl animate-blob" style="animation-delay:3s"></div>
+    </div>
+
+    <!-- ============ 1) ANAHTAR EKRANI ============ -->
+    <div id="ekran-anahtar" class="relative min-h-screen flex items-center justify-center p-6">
+        <div class="cam rounded-3xl p-8 w-full max-w-md shadow-2xl">
+            <div class="marka-gradyan w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-extrabold mb-5 shadow-lg shadow-indigo-500/30">G</div>
+            <h1 class="text-xl font-bold mb-1">Süper Admin</h1>
+            <p class="text-sm text-white/50 mb-6">Firma açma ve yönetim ekranı. Bu alan yalnızca platform sahibine aittir.</p>
+            <div id="anahtar-hata" class="hidden mb-4 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-sm text-red-300"></div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Süper Admin Anahtarı</label>
+            <input id="anahtar" type="password" class="alan mb-5" placeholder="••••••••••••••••" autocomplete="off">
+            <button onclick="anahtarGiris()" id="anahtar-btn"
+                    class="marka-gradyan w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">
+                DEVAM ET
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ 2) FİRMA YÖNETİMİ ============ -->
+    <div id="ekran-panel" class="relative hidden min-h-screen p-6 lg:p-10 max-w-6xl mx-auto">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div class="flex items-center gap-3">
+                <div class="marka-gradyan w-11 h-11 rounded-xl flex items-center justify-center text-lg font-extrabold shadow-lg shadow-indigo-500/30">G</div>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">Firma Yönetimi</h1>
+                    <p class="text-xs text-white/40">Süper admin · Glow Saha</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="firmalariYukle()" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition">Yenile</button>
+                <button onclick="modalAc()" class="marka-gradyan px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">+ Yeni Firma</button>
+                <button onclick="cikis()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-white/50 hover:text-white bg-white/5 border border-white/10 transition">Çıkış</button>
+            </div>
+        </div>
+
+        <div id="genel-mesaj" class="hidden mb-5 rounded-xl px-4 py-3 text-sm"></div>
+
+        <div id="firma-liste" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="cam rounded-2xl p-6 text-white/40 text-sm">Yükleniyor…</div>
+        </div>
+    </div>
+
+    <!-- ============ YENİ FİRMA MODALI ============ -->
+    <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="cam rounded-3xl w-full max-w-lg p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5">
+                <h2 class="text-lg font-bold">Yeni Firma Kur</h2>
+                <button onclick="modalKapat()" class="text-white/40 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div id="modal-hata" class="hidden mb-4 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-sm text-red-300"></div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Adı</label>
+                    <input id="f-ad" class="alan" placeholder="Örn: Neşe Yönetim">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Kodu</label>
+                        <input id="f-kod" class="alan uppercase" placeholder="NESE2026" maxlength="20">
+                        <p class="text-[11px] text-white/30 mt-1">4-20 karakter, BÜYÜK harf + rakam. Personel girişte bunu kullanır.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Tema Rengi</label>
+                        <div class="flex items-center gap-2">
+                            <input id="f-renk" type="color" value="#3B82F6" class="w-11 h-11 rounded-lg bg-transparent border border-white/10 cursor-pointer p-1">
+                            <input id="f-renk-hex" class="alan" value="#3B82F6" maxlength="7">
+                        </div>
+                    </div>
+                </div>
+                <hr class="border-white/10">
+                <p class="text-xs font-semibold uppercase tracking-wider text-white/40">İlk Yönetici Hesabı</p>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Ad Soyad</label>
+                    <input id="f-yonetici" class="alan" placeholder="Örn: Ömer Yılmaz">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Telefon</label>
+                        <input id="f-tel" class="alan" placeholder="05XXXXXXXXX">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Şifre (en az 10)</label>
+                        <input id="f-sifre" type="text" class="alan" placeholder="güçlü-bir-şifre">
+                    </div>
+                </div>
+                <button onclick="firmaKur()" id="kur-btn"
+                        class="marka-gradyan w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">
+                    FİRMAYI KUR
+                </button>
+                <p class="text-[11px] text-white/30 leading-relaxed">Kurulum sonrası yönetici web paneline ve mobil uygulamaya
+                    <b>firma kodu + telefon + şifre</b> ile giriş yapabilir. Logo ve diğer ayarları firma kendi panelinden yükler.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase bağlantısı (api-supabase.js ile aynı proje)
+        const SUPABASE_URL = 'https://bfkiifbzxwhbviluyzcp.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_HdcOSN5v1E4YBoQok996Mg_W1i1xnGx';
+        const UC = `${SUPABASE_URL}/functions/v1/super-admin`;
+
+        // Anahtar yalnızca bu sekmenin ömrü boyunca tutulur (sessionStorage).
+        let superKey = sessionStorage.getItem('super_key') || '';
+
+        const $ = (id) => document.getElementById(id);
+        function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+        async function istek(govde) {
+            const res = await fetch(UC, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'x-super-key': superKey,
+                },
+                body: JSON.stringify(govde),
+            });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.message || `Hata (${res.status})`);
+            return d;
+        }
+
+        // ---- Anahtar ekranı ----
+        async function anahtarGiris() {
+            const btn = $('anahtar-btn');
+            superKey = $('anahtar').value.trim();
+            if (!superKey) return;
+            btn.disabled = true; btn.textContent = 'KONTROL EDİLİYOR…';
+            try {
+                await istek({ islem: 'listele' });
+                sessionStorage.setItem('super_key', superKey);
+                $('ekran-anahtar').classList.add('hidden');
+                $('ekran-panel').classList.remove('hidden');
+                firmalariYukle();
+            } catch (e) {
+                const kutu = $('anahtar-hata');
+                kutu.textContent = e.message;
+                kutu.classList.remove('hidden');
+            } finally {
+                btn.disabled = false; btn.textContent = 'DEVAM ET';
+            }
+        }
+        $('anahtar').addEventListener('keydown', (e) => { if (e.key === 'Enter') anahtarGiris(); });
+
+        function cikis() {
+            sessionStorage.removeItem('super_key');
+            superKey = '';
+            location.reload();
+        }
+
+        // ---- Firma listesi ----
+        async function firmalariYukle() {
+            try {
+                const d = await istek({ islem: 'listele' });
+                const kap = $('firma-liste');
+                if (!d.firmalar?.length) {
+                    kap.innerHTML = '<div class="cam rounded-2xl p-6 text-white/40 text-sm">Henüz firma yok. "+ Yeni Firma" ile ilkini kur.</div>';
+                    return;
+                }
+                kap.innerHTML = d.firmalar.map((f) => {
+                    const logoUrl = f.logo
+                        ? (/^https?:/.test(f.logo) ? f.logo : `${SUPABASE_URL}/storage/v1/object/public/${f.logo}`)
+                        : null;
+                    const marka = logoUrl
+                        ? `<img src="${esc(logoUrl)}" class="w-full h-full object-contain" alt="logo">`
+                        : `<span class="text-lg font-extrabold text-white">${esc((f.ad || 'G').charAt(0).toUpperCase())}</span>`;
+                    const tarih = f.olusturma_tarihi ? new Date(f.olusturma_tarihi).toLocaleDateString('tr-TR') : '-';
+                    return `
+                    <div class="cam rounded-2xl p-5 ${f.aktif ? '' : 'opacity-60'}">
+                        <div class="flex items-start gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 ${logoUrl ? 'bg-white' : ''}"
+                                 style="${logoUrl ? '' : `background: linear-gradient(135deg, ${esc(f.hex_color || '#3B82F6')}, rgba(139,92,246,.9))`}">${marka}</div>
+                            <div class="min-w-0">
+                                <p class="font-bold truncate">${esc(f.ad)}</p>
+                                <p class="text-xs text-white/40 font-mono">${esc(f.firma_kodu)}</p>
+                            </div>
+                            <span class="ml-auto text-[11px] font-bold px-2 py-1 rounded-lg ${f.aktif ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300'}">
+                                ${f.aktif ? 'AKTİF' : 'PASİF'}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs text-white/50 mb-4">
+                            <span>${f.personel_sayisi} personel</span>
+                            <span>${f.site_sayisi} tesis</span>
+                            <span class="ml-auto">${esc(tarih)}</span>
+                        </div>
+                        <button onclick="durumDegistir(${Number(f.id)}, ${f.aktif ? 'false' : 'true'}, '${esc(f.ad).replace(/'/g, "\\'")}')"
+                                class="w-full py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
+                                    ? 'border-red-500/30 text-red-300 hover:bg-red-500/10'
+                                    : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'}">
+                            ${f.aktif ? 'Pasifleştir (girişleri kapat)' : 'Aktifleştir'}
+                        </button>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                mesaj(e.message, true);
+            }
+        }
+
+        async function durumDegistir(id, aktif, ad) {
+            const onay = confirm(aktif
+                ? `"${ad}" aktifleştirilsin mi? Personel yeniden giriş yapabilir.`
+                : `"${ad}" pasifleştirilsin mi? Tüm personelin girişi engellenir (veri silinmez).`);
+            if (!onay) return;
+            try {
+                const d = await istek({ islem: 'durum', firma_id: id, aktif });
+                mesaj(d.message, false);
+                firmalariYukle();
+            } catch (e) { mesaj(e.message, true); }
+        }
+
+        // ---- Yeni firma ----
+        function modalAc() { $('modal').classList.remove('hidden'); $('modal-hata').classList.add('hidden'); }
+        function modalKapat() { $('modal').classList.add('hidden'); }
+        $('f-renk').addEventListener('input', (e) => { $('f-renk-hex').value = e.target.value.toUpperCase(); });
+        $('f-renk-hex').addEventListener('input', (e) => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) $('f-renk').value = e.target.value;
+        });
+
+        async function firmaKur() {
+            const btn = $('kur-btn');
+            const govde = {
+                islem: 'kur',
+                ad: $('f-ad').value.trim(),
+                firma_kodu: $('f-kod').value.trim().toUpperCase(),
+                hex_color: $('f-renk-hex').value.trim(),
+                yonetici_ad: $('f-yonetici').value.trim(),
+                telefon: $('f-tel').value.trim(),
+                sifre: $('f-sifre').value,
+            };
+            btn.disabled = true; btn.textContent = 'KURULUYOR…';
+            try {
+                const d = await istek(govde);
+                modalKapat();
+                mesaj(`${d.message} "${govde.ad}" (${govde.firma_kodu}) — yönetici artık giriş yapabilir.`, false);
+                ['f-ad', 'f-kod', 'f-yonetici', 'f-tel', 'f-sifre'].forEach((id) => { $(id).value = ''; });
+                firmalariYukle();
+            } catch (e) {
+                const kutu = $('modal-hata');
+                kutu.textContent = e.message;
+                kutu.classList.remove('hidden');
+            } finally {
+                btn.disabled = false; btn.textContent = 'FİRMAYI KUR';
+            }
+        }
+
+        function mesaj(metin, hata) {
+            const kutu = $('genel-mesaj');
+            kutu.textContent = metin;
+            kutu.className = `mb-5 rounded-xl px-4 py-3 text-sm border ${hata
+                ? 'bg-red-500/10 border-red-500/25 text-red-300'
+                : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'}`;
+            kutu.classList.remove('hidden');
+            setTimeout(() => kutu.classList.add('hidden'), 6000);
+        }
+
+        // Sayfa açılışı: kayıtlı anahtar varsa doğrudan panele geç.
+        if (superKey) {
+            $('ekran-anahtar').classList.add('hidden');
+            $('ekran-panel').classList.remove('hidden');
+            firmalariYukle();
+        }
+    </script>
+</body>
+</html>

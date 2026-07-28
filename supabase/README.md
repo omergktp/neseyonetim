@@ -171,3 +171,29 @@ görebilir. Görev başlatma/tamamlama artık sunucuda da 50 m kuralına tabidir
   Anon/erişim anahtarı sızsa bile başka firmanın verisi görülemez.
 - **Gerçek zamanlı:** Supabase Realtime ile görev/arıza güncellemeleri anında panele düşer.
 - **Sunucu yok:** PHP hosting/XAMPP gerekmez; her yerden erişim.
+
+---
+
+## Süper Admin (firma açma) — super-admin fonksiyonu
+
+Platform sahibinin firma kurma/listeleme/pasifleştirme ucu. Arayüzü:
+`web/panel/super.html`. Kimlik: `x-super-key` başlığı, `SUPER_ADMIN_KEY`
+secret'ı ile sabit-zamanlı karşılaştırılır; hatalı denemeler `login_guard`
+ile IP başına kilitlenir (5 hata -> 15 dk).
+
+Kurulum:
+
+```bash
+# 1) Güçlü bir anahtar üret ve secret olarak kaydet (repo'da TUTMA)
+npx supabase secrets set SUPER_ADMIN_KEY="uzun-rastgele-anahtar"
+
+# 2) Fonksiyonu yayınla
+npx supabase functions deploy super-admin
+```
+
+Kullanım: `super.html` sayfasını aç, anahtarı gir; "+ Yeni Firma" ile
+firma adı/kodu/tema rengi ve ilk yönetici (ad, telefon, min 10 karakter
+şifre) tanımla. Yönetici, gölge auth kullanıcısı İLK girişinde otomatik
+oluşturulur — ekstra adım gerekmez. Pasifleştirilen firmanın tüm
+personel girişleri engellenir (login zaten `firma.aktif` kontrolü yapar);
+veri silinmez.
