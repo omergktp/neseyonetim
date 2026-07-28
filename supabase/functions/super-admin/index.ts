@@ -193,27 +193,39 @@ Deno.serve(async (req) => {
     return json({ message: `Süper admin hesabı oluşturuldu: ${email}` });
   }
 
-  // ---------------- LİSTELE ----------------
+  // ---------------- LİSTELE (firma başına kullanım metrikleriyle) ----------------
   if (islem === "listele") {
-    const [{ data: firmalar, error: fErr }, { data: personeller }, { data: siteler }] =
-      await Promise.all([
-        admin.from("firmalar")
-          .select("id, firma_kodu, ad, logo, hex_color, aktif, olusturma_tarihi")
-          .order("olusturma_tarihi", { ascending: false }),
-        admin.from("personeller").select("firma_id"),
-        admin.from("siteler").select("firma_id"),
-      ]);
-    if (fErr) return json({ message: "Firmalar okunamadı." }, 500);
+    const kesim = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const [fRes, pRes, sRes, aRes, iRes] = await Promise.all([
+      admin.from("firmalar")
+        .select("id, firma_kodu, ad, logo, hex_color, aktif, olusturma_tarihi")
+        .order("olusturma_tarihi", { ascending: false }),
+      admin.from("personeller").select("firma_id"),
+      admin.from("siteler").select("firma_id"),
+      admin.from("arizalar").select("firma_id, durum"),
+      // Son 30 günün iş emirleri: firmanın ürünü gerçekten kullandığının işareti
+      admin.from("is_emirleri").select("firma_id, olusturma_tarihi").gte("olusturma_tarihi", kesim),
+    ]);
+    if (fRes.error) return json({ message: "Firmalar okunamadı." }, 500);
 
-    const say = (liste: { firma_id: number }[] | null, id: number) =>
-      (liste ?? []).filter((x) => String(x.firma_id) === String(id)).length;
+    // deno-lint-ignore no-explicit-any
+    const say = (liste: any[] | null, id: number, sart: (x: any) => boolean = () => true) =>
+      (liste ?? []).filter((x) => String(x.firma_id) === String(id) && sart(x)).length;
 
     return json({
-      firmalar: (firmalar ?? []).map((f) => ({
-        ...f,
-        personel_sayisi: say(personeller as never, f.id),
-        site_sayisi: say(siteler as never, f.id),
-      })),
+      firmalar: (fRes.data ?? []).map((f) => {
+        const isler = (iRes.data ?? []).filter((x) => String(x.firma_id) === String(f.id));
+        const sonIs = isler.reduce(
+          (m, x) => (x.olusturma_tarihi > m ? x.olusturma_tarihi : m), "");
+        return {
+          ...f,
+          personel_sayisi: say(pRes.data, f.id),
+          site_sayisi: say(sRes.data, f.id),
+          acik_ariza: say(aRes.data, f.id, (x) => x.durum !== "cozuldu"),
+          is_emri_30g: isler.length,
+          son_is_tarihi: sonIs || null,
+        };
+      }),
     });
   }
 
@@ -226,25 +238,27 @@ Deno.serve(async (req) => {
       const { count } = await q;
       return count ?? 0;
     };
-    const [firmaToplam, firmaAktif, personel, site, isToplam, isTamam, arizaAcik] =
+    // Platform sahibinin metrikleri: firma sayıları + büyüme; iş emri
+    // detayları firma kartlarında (banane-etkisi yaratan toplamlar yok).
+    const ayBasi = new Date();
+    ayBasi.setUTCDate(1);
+    ayBasi.setUTCHours(0, 0, 0, 0);
+    const [firmaToplam, firmaAktif, personel, site, buAy] =
       await Promise.all([
         say("firmalar"),
         say("firmalar", (q) => q.eq("aktif", true)),
         say("personeller"),
         say("siteler"),
-        say("is_emirleri"),
-        say("is_emirleri", (q) => q.eq("durum", "tamamlandi")),
-        say("arizalar", (q) => q.neq("durum", "cozuldu")),
+        say("firmalar", (q) => q.gte("olusturma_tarihi", ayBasi.toISOString())),
       ]);
     return json({
       ozet: {
         firma_toplam: firmaToplam,
         firma_aktif: firmaAktif,
+        firma_pasif: firmaToplam - firmaAktif,
         personel_toplam: personel,
         site_toplam: site,
-        is_emri_toplam: isToplam,
-        is_emri_tamamlanan: isTamam,
-        acik_ariza: arizaAcik,
+        bu_ay_firma: buAy,
       },
     });
   }
