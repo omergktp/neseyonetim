@@ -164,3 +164,27 @@ apartsoft.com · aidatium.com.tr · ekonomim.com (TRFMA) · nip.tuik.gov.tr · a
 fieldco.com.tr/tr/fiyatlar · connecteam.com/pricing · facilio.com/blog (MaintainX/UpKeep) ·
 help.getmaintainx.com/offline-mode · timemark.com · provvio.com · qrdevriye.com ·
 sahaglowlounge.com (isim çakışması) · tesisyon.com · sitera.com.tr
+
+---
+
+## Ek: "Blokent" Çakışma Doğrulaması (28 Temmuz 2026)
+
+Sonuç: **KULLANILABİLİR.** Türkiye'de Blokent adlı konut projesi, TOKİ etabı,
+şirket, uygulama veya yerleşik marka bulunamadı. blokent.com RDAP ile KESİN
+kayıtsız; .com.tr/.net/.app DNS'siz (muhtemelen boş). Tek küresel kullanım:
+Güney Afrika/Nijerya merkezli "Blok Entertainment" müzik kolektifi (farklı
+sektör/coğrafya — düşük risk; Instagram/Linktree'de blokent kullanıcı adlarının
+bir kısmını tutuyorlar). "Bloknet" adlı yerleşik ISS bulunamadı.
+
+Yedek aday Kavio: RİSKLİ — kavio.com 2000'den beri ABD'li toptan giyim
+markasında (2034'e kadar kayıtlı), global SEO'da onlarla yarışılır.
+
+Tescil öncesi zorunlu adımlar (bu ortamdan yapılamayanlar):
+1. TÜRKPATENT marka araştırması (9/35/36/37/42. sınıflar; "blokent",
+   "blok kent", "bloknet" benzerlik) — yurt dışı IP engeli nedeniyle
+   ajan erişemedi, elle yapılmalı; ideali marka vekili raporu.
+2. Domainleri hemen kaydet: blokent.com (kesin boş), blokent.com.tr,
+   blokent.net, blokent.app.
+3. MERSİS/Ticaret Sicili unvan sorgusu.
+4. @blokent sosyal medya handle kontrolü + rezervasyon.
+5. WIPO Global Brand Database kontrolü.
