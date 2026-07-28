@@ -24,6 +24,35 @@
         html { color-scheme: light; }
         html.dark { color-scheme: dark; }
 
+        /* ===== Marka token'ları (beyaz etiket) =====
+           Firma tema rengi localStorage'dan (glow_firma) okunup JS ile --marka-1'e uygulanır;
+           --marka-2 ondan türetilir (HSL ton +30). */
+        :root { --marka-1: #3B82F6; --marka-2: #8B5CF6; }
+        .marka-gradyan { background: linear-gradient(135deg, var(--marka-1), var(--marka-2)); }
+
+        /* Sidebar: koyu zemine dikey gradyan (login sayfasının diliyle uyumlu) */
+        aside#sidebar { background: linear-gradient(180deg, #0f172a 0%, #020617 100%); }
+        .dark aside#sidebar { background: linear-gradient(180deg, #0b1322 0%, #04070f 100%); }
+
+        /* Stat kartı ikon kutusu: zemin rengine yumuşak parlama katmanı */
+        .stat-ikon { background-image: linear-gradient(135deg, rgba(255,255,255,.65), rgba(255,255,255,0)); }
+        .dark .stat-ikon { background-image: linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,0)); }
+
+        /* Tablolar: yapışkan başlık + zebra satırlar */
+        main section thead th { position: sticky; top: 0; z-index: 5; background-color: #f8fafc; }
+        .dark main section thead th { background-color: #1b2436; }
+        main section tbody tr:nth-child(even) { background-color: rgba(148,163,184,.07); }
+        .dark main section tbody tr:nth-child(even) { background-color: rgba(148,163,184,.05); }
+        main section tbody tr { transition: background-color .15s ease; }
+
+        /* Modal başlığına ince marka aksanı (üstte 3px gradyan çizgi) */
+        .modal > div { position: relative; }
+        .modal > div::before { content: ''; position: absolute; top: 0; left: 1.25rem; right: 1.25rem; height: 3px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, var(--marka-1), var(--marka-2)); pointer-events: none; }
+
+        /* Ortak form alanı reçetesi (yeni eklenecek alanlar için; mevcut inputlar Tailwind sınıflarıyla kalır) */
+        .alan { width: 100%; padding: .625rem .75rem; border: 1px solid #e2e8f0; border-radius: .5rem; outline: none; background: #fff; }
+        .alan:focus { border-color: var(--marka-1); box-shadow: 0 0 0 2px color-mix(in srgb, var(--marka-1) 30%, transparent); }
+
         /* Modal açılış animasyonu */
         @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
         .modal.flex > div { animation: modalIn .18s ease-out; }
@@ -117,41 +146,41 @@
     <!-- Sidebar (mobilde off-canvas) -->
     <aside id="sidebar" class="w-64 bg-slate-900 text-white flex flex-col transition-transform duration-200 fixed lg:static inset-y-0 left-0 z-40 -translate-x-full lg:translate-x-0">
         <div class="h-16 flex items-center px-6 border-b border-slate-800">
-            <div id="marka-logo" class="w-8 h-8 flex items-center justify-center font-bold mr-3 shadow-lg shadow-indigo-500/30 border border-white/20 overflow-hidden" style="background: linear-gradient(135deg, #3B82F6, #8B5CF6); border-radius: 8px;">G</div>
+            <div id="marka-logo" class="marka-gradyan w-9 h-9 flex items-center justify-center font-bold mr-3 shadow-lg shadow-indigo-500/30 border border-white/20 overflow-hidden" style="border-radius: 10px;">G</div>
             <span id="marka-ad" class="text-lg font-bold tracking-tight truncate">GLOW SAHA</span>
         </div>
 
         <div class="flex-1 overflow-y-auto py-4">
             <nav class="space-y-1 px-3">
-                <a id="nav-dashboard" href="#" onclick="switchView('dashboard'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-dashboard" href="#" onclick="switchView('dashboard'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-chart-pie w-5 text-center"></i><span class="font-medium text-sm">Dashboard</span>
                 </a>
-                <a id="nav-personeller" href="#" onclick="switchView('personeller'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-personeller" href="#" onclick="switchView('personeller'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-users w-5 text-center"></i><span class="font-medium text-sm">Personeller</span>
                 </a>
-                <a id="nav-siteler" href="#" onclick="switchView('siteler'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-siteler" href="#" onclick="switchView('siteler'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-building w-5 text-center"></i><span class="font-medium text-sm">Siteler / Tesisler</span>
                 </a>
-                <a id="nav-isemirleri" href="#" onclick="switchView('isemirleri'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-isemirleri" href="#" onclick="switchView('isemirleri'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-clipboard-list w-5 text-center"></i><span class="font-medium text-sm">İş Emirleri</span>
                 </a>
-                <a id="nav-arizalar" href="#" onclick="switchView('arizalar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-arizalar" href="#" onclick="switchView('arizalar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-wrench w-5 text-center"></i><span class="font-medium text-sm">Arıza Kayıtları</span>
                 </a>
-                <a id="nav-masraflar" href="#" onclick="switchView('masraflar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-masraflar" href="#" onclick="switchView('masraflar'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-receipt w-5 text-center"></i><span class="font-medium text-sm">Masraflar</span>
                 </a>
-                <a id="nav-periyodik" href="#" onclick="switchView('periyodik'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-periyodik" href="#" onclick="switchView('periyodik'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-repeat w-5 text-center"></i><span class="font-medium text-sm">Periyodik Görevler</span>
                 </a>
-                <a id="nav-firma" href="#" onclick="switchView('firma'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group">
+                <a id="nav-firma" href="#" onclick="switchView('firma'); return false;" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group">
                     <i class="fa-solid fa-gear w-5 text-center"></i><span class="font-medium text-sm">Firma Ayarları</span>
                 </a>
             </nav>
         </div>
 
         <div class="p-4 border-t border-slate-800">
-            <a href="index.html" onclick="localStorage.clear();" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer">
+            <a href="index.html" onclick="localStorage.clear();" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors cursor-pointer">
                 <i class="fa-solid fa-right-from-bracket w-5 text-center"></i><span class="font-medium text-sm">Çıkış Yap</span>
             </a>
         </div>
@@ -178,12 +207,14 @@
                         <p id="user-name" class="text-sm font-semibold text-slate-800">-</p>
                         <p class="text-xs text-slate-500">Yönetici</p>
                     </div>
-                    <div id="user-avatar" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-center font-bold shadow-sm">?</div>
+                    <div id="user-avatar" class="marka-gradyan w-10 h-10 rounded-full text-white flex items-center justify-center font-bold shadow-sm">?</div>
                 </div>
             </div>
         </header>
 
         <div class="flex-1 overflow-auto p-8">
+            <!-- Geniş ekranda aşırı yayılmayı önleyen içerik sınırı -->
+            <div class="max-w-[1400px] mx-auto">
 
             <!-- ============ DASHBOARD ============ -->
             <section id="view-dashboard">
@@ -206,29 +237,29 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl"><i class="fa-solid fa-clipboard-check"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Tamamlanan İş</p><h3 id="stat-tamamlanan" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl"><i class="fa-solid fa-clipboard-check"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Tamamlanan İş</p><h3 id="stat-tamamlanan" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl"><i class="fa-solid fa-spinner"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Devam Eden İş</p><h3 id="stat-devam" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl"><i class="fa-solid fa-spinner"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Devam Eden İş</p><h3 id="stat-devam" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
-                    <div id="kart-geciken" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl"><i class="fa-solid fa-hourglass-end"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Geciken İş</p><h3 id="stat-geciken" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div id="kart-geciken" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Geciken İş</p><h3 id="stat-geciken" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Açık Arızalar</p><h3 id="stat-ariza" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Açık Arızalar</p><h3 id="stat-ariza" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl"><i class="fa-solid fa-stopwatch"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Ort. Çözüm (30g)</p><h3 id="stat-cozum" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl"><i class="fa-solid fa-stopwatch"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Ort. Çözüm (30g)</p><h3 id="stat-cozum" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
-                        <div><p class="text-xs text-slate-500 font-medium mb-1">Aktif Personel</p><h3 id="stat-personel" class="text-xl font-bold text-slate-800">-</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/50 flex items-center gap-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                        <div class="stat-ikon w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
+                        <div><p class="text-xs text-slate-500 font-medium mb-1">Aktif Personel</p><h3 id="stat-personel" class="text-2xl font-bold text-slate-800 tracking-tight">-</h3></div>
                     </div>
                 </div>
 
@@ -461,6 +492,7 @@
                 </div>
             </section>
 
+            </div>
         </div>
     </main>
 
@@ -837,9 +869,9 @@
             document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
             document.getElementById('view-' + name).classList.remove('hidden');
             document.getElementById('page-title').innerText = BASLIKLAR[name];
-            document.querySelectorAll('.nav-link').forEach(a => { a.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group text-slate-400 hover:text-white hover:bg-slate-800'; });
+            document.querySelectorAll('.nav-link').forEach(a => { a.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group text-slate-400 hover:text-white hover:bg-white/5'; });
             const aktif = document.getElementById('nav-' + (name === 'isemirleri' ? 'isemirleri' : name));
-            aktif.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group bg-blue-500/10 text-blue-400 border border-blue-500/20';
+            aktif.className = 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group marka-gradyan text-white shadow-lg shadow-indigo-500/25';
             toggleSidebar(false); // mobilde seçince menüyü kapat
             (YUKLEYICI[name] || (()=>{}))();
         }
@@ -875,7 +907,7 @@
                 const gecikenEl = document.getElementById('stat-geciken');
                 gecikenEl.innerText = s.geciken_is ?? 0;
                 gecikenEl.className = (s.geciken_is > 0)
-                    ? 'text-xl font-bold text-rose-600' : 'text-xl font-bold text-slate-800';
+                    ? 'text-2xl font-bold text-rose-600 tracking-tight' : 'text-2xl font-bold text-slate-800 tracking-tight';
                 document.getElementById('kart-geciken').classList.toggle('ring-2', s.geciken_is > 0);
                 document.getElementById('kart-geciken').classList.toggle('ring-rose-200', s.geciken_is > 0);
                 document.getElementById('stat-cozum').innerText =
@@ -898,7 +930,10 @@
                 const ozetBox = document.getElementById('tesisler-ozet');
                 ozetBox.innerHTML = sites.length ? sites.map(st => {
                     const aktif = String(st.id) === String(siteId);
-                    return `<button onclick="dashboardSiteSec('${st.id}')" class="text-left bg-white p-5 rounded-2xl border ${aktif ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100/50'} shadow-sm hover:shadow-md transition-all">
+                    // Tamamlanma göstergesi: bu ay biten / (biten + devam eden)
+                    const isToplam = Number(st.bu_ay_tamamlanan || 0) + Number(st.devam_eden || 0);
+                    const yuzde = isToplam ? Math.round(100 * Number(st.bu_ay_tamamlanan || 0) / isToplam) : 0;
+                    return `<button onclick="dashboardSiteSec('${st.id}')" class="text-left bg-white p-5 rounded-2xl border ${aktif ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100/50'} shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="font-bold text-slate-800 truncate">${esc(st.ad)}</h3>
                             <i class="fa-solid fa-building ${aktif ? 'text-blue-500' : 'text-slate-300'}"></i>
@@ -907,6 +942,10 @@
                             <div><span class="text-amber-600 font-bold text-lg">${st.devam_eden}</span><p class="text-slate-400 text-xs">Devam eden</p></div>
                             <div><span class="text-red-500 font-bold text-lg">${st.acik_ariza}</span><p class="text-slate-400 text-xs">Açık arıza</p></div>
                             <div><span class="text-emerald-600 font-bold text-lg">${st.bu_ay_tamamlanan}</span><p class="text-slate-400 text-xs">Bu ay biten</p></div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between text-[11px] text-slate-400 mb-1"><span>Bu ay tamamlanma</span><span class="font-semibold">%${yuzde}</span></div>
+                            <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full marka-gradyan" style="width:${yuzde}%"></div></div>
                         </div>
                     </button>`;
                 }).join('') : `<div class="text-slate-400 text-sm">Henüz tesis eklenmemiş.</div>`;
@@ -1731,6 +1770,40 @@
         let _firmaLogoYeni = null;  // seçilen yeni dosya (File)
         let _firmaLogoSil = false;  // "logoyu kaldır" işaretlendi mi
 
+        // ---- Marka rengi (beyaz etiket) ----
+        // Firma tema rengini --marka-1'e uygular; --marka-2'yi HSL tonunu +30 kaydırarak türetir.
+        function _hexHsl(hex) {
+            const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0; const l = (max + min) / 2;
+            if (max !== min) {
+                const d = max - min;
+                s = l > .5 ? d / (2 - max - min) : d / (max + min);
+                h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+                h *= 60;
+            }
+            return [h, s, l];
+        }
+        function _hslHex(h, s, l) {
+            h = ((h % 360) + 360) % 360;
+            const f = (n) => {
+                const k = (n + h / 30) % 12;
+                const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+                return Math.round(c * 255).toString(16).padStart(2, '0');
+            };
+            return '#' + f(0) + f(8) + f(4);
+        }
+        function markaRenkUygula() {
+            try {
+                const f = JSON.parse(localStorage.getItem('glow_firma') || 'null');
+                const aday = f ? (f.tema_rengi || f.hex_color || '') : '';
+                if (!/^#[0-9A-Fa-f]{6}$/.test(aday)) return;
+                const [h, s, l] = _hexHsl(aday);
+                document.documentElement.style.setProperty('--marka-1', aday);
+                document.documentElement.style.setProperty('--marka-2', _hslHex(h + 30, s, l));
+            } catch (_) {}
+        }
+
         // Kenar çubuğundaki markayı firma logosu/adıyla değiştirir.
         function markaGuncelle(firma) {
             if (!firma) return;
@@ -1817,6 +1890,7 @@
                         f.ad = payload.ad; f.tema_rengi = hex;
                         if ('logo' in payload) f.logo = payload.logo;
                         localStorage.setItem('glow_firma', JSON.stringify(f));
+                        markaRenkUygula(); // yeni tema rengi panele anında yansısın
                     } catch (_) {}
                     loadFirma();
                 } else formHata(e.target, data.message || 'Kaydedilemedi.');
@@ -1827,6 +1901,7 @@
         // ---- Başlangıç ----
         (function init() {
             _temaIkonGuncelle();
+            markaRenkUygula(); // firma tema rengi varsa marka token'larına uygula
             try { const u = JSON.parse(localStorage.getItem('glow_user') || '{}'); if (u.ad_soyad) { document.getElementById('user-name').innerText = u.ad_soyad; document.getElementById('user-avatar').innerText = bashar(u.ad_soyad) || '?'; } } catch (_) {}
             try { markaGuncelle(JSON.parse(localStorage.getItem('glow_firma') || 'null')); } catch (_) {}
             switchView('dashboard');
