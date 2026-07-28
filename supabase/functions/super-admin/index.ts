@@ -21,6 +21,8 @@
 //                                          oturumu üret (destek/impersonation)
 //   { islem: "personeller", firma_id }   — firmanın personel listesi
 //   { islem: "sifre", personel_id, yeni_sifre } — personel şifresi sıfırla
+//   { islem: "ozet" }                    — platform geneli sayılar
+//   { islem: "duzenle", firma_id, ad?, hex_color?, firma_kodu? } — firma bilgisi
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs@2.4.3";
@@ -150,6 +152,77 @@ Deno.serve(async (req) => {
         site_sayisi: say(siteler as never, f.id),
       })),
     });
+  }
+
+  // ---------------- ÖZET (platform geneli sayılar) ----------------
+  if (islem === "ozet") {
+    // deno-lint-ignore no-explicit-any
+    const say = async (tablo: string, sarti?: (q: any) => any): Promise<number> => {
+      let q = admin.from(tablo).select("*", { count: "exact", head: true });
+      if (sarti) q = sarti(q);
+      const { count } = await q;
+      return count ?? 0;
+    };
+    const [firmaToplam, firmaAktif, personel, site, isToplam, isTamam, arizaAcik] =
+      await Promise.all([
+        say("firmalar"),
+        say("firmalar", (q) => q.eq("aktif", true)),
+        say("personeller"),
+        say("siteler"),
+        say("is_emirleri"),
+        say("is_emirleri", (q) => q.eq("durum", "tamamlandi")),
+        say("arizalar", (q) => q.neq("durum", "cozuldu")),
+      ]);
+    return json({
+      ozet: {
+        firma_toplam: firmaToplam,
+        firma_aktif: firmaAktif,
+        personel_toplam: personel,
+        site_toplam: site,
+        is_emri_toplam: isToplam,
+        is_emri_tamamlanan: isTamam,
+        acik_ariza: arizaAcik,
+      },
+    });
+  }
+
+  // ---------------- DÜZENLE (firma bilgileri: ad / renk / kod) ----------------
+  if (islem === "duzenle") {
+    const firmaId = Number(body.firma_id);
+    if (!Number.isInteger(firmaId) || firmaId <= 0) {
+      return json({ message: "Geçersiz firma_id." }, 422);
+    }
+    const guncelleme: Record<string, string> = {};
+
+    if (body.ad !== undefined) {
+      const ad = (body.ad ?? "").toString().trim();
+      if (!ad) return json({ message: "Firma adı boş olamaz." }, 422);
+      guncelleme.ad = ad;
+    }
+    if (body.hex_color !== undefined) {
+      const renk = (body.hex_color ?? "").toString().trim();
+      if (!/^#[0-9A-Fa-f]{6}$/.test(renk)) {
+        return json({ message: "Tema rengi #RRGGBB biçiminde olmalı." }, 422);
+      }
+      guncelleme.hex_color = renk;
+    }
+    if (body.firma_kodu !== undefined) {
+      const kod = (body.firma_kodu ?? "").toString().trim().toUpperCase();
+      if (!/^[A-Z0-9]{4,20}$/.test(kod)) {
+        return json({ message: "Firma kodu 4-20 karakter, yalnızca BÜYÜK harf ve rakam olmalı." }, 422);
+      }
+      const { data: baska } = await admin
+        .from("firmalar").select("id").eq("firma_kodu", kod).neq("id", firmaId).maybeSingle();
+      if (baska) return json({ message: `'${kod}' firma kodu başka bir firmada kayıtlı.` }, 409);
+      guncelleme.firma_kodu = kod;
+    }
+    if (Object.keys(guncelleme).length === 0) {
+      return json({ message: "Güncellenecek alan yok." }, 422);
+    }
+
+    const { error } = await admin.from("firmalar").update(guncelleme).eq("id", firmaId);
+    if (error) return json({ message: "Firma güncellenemedi." }, 500);
+    return json({ message: "Firma bilgileri güncellendi." });
   }
 
   // ---------------- KUR (yeni firma + ilk yönetici) ----------------

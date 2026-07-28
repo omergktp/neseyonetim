@@ -61,7 +61,15 @@
             </div>
         </div>
 
+        <!-- Platform geneli sayılar -->
+        <div id="ozet-satir" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6"></div>
+
         <div id="genel-mesaj" class="hidden mb-5 rounded-xl px-4 py-3 text-sm"></div>
+
+        <!-- Arama -->
+        <div class="mb-4">
+            <input id="ara" class="alan max-w-sm" placeholder="Firma adı veya kodu ara…" oninput="firmalariCiz()">
+        </div>
 
         <div id="firma-liste" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div class="cam rounded-2xl p-6 text-white/40 text-sm">Yükleniyor…</div>
@@ -133,6 +141,42 @@
     <!-- Kart üzerinden logo değiştirme için gizli dosya seçici -->
     <input id="logo-degistir-dosya" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
 
+    <!-- ============ FİRMA DÜZENLE MODALI ============ -->
+    <div id="duzenle-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="cam rounded-3xl w-full max-w-md p-7 shadow-2xl">
+            <div class="flex items-center justify-between mb-5">
+                <h2 class="text-lg font-bold">Firma Bilgilerini Düzenle</h2>
+                <button onclick="document.getElementById('duzenle-modal').classList.add('hidden')" class="text-white/40 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div id="duzenle-hata" class="hidden mb-4 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-sm text-red-300"></div>
+            <input type="hidden" id="d-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Adı</label>
+                    <input id="d-ad" class="alan">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Firma Kodu</label>
+                        <input id="d-kod" class="alan uppercase" maxlength="20">
+                        <p class="text-[11px] text-amber-300/70 mt-1">Değişirse personel yeni kodla giriş yapar!</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-1.5">Tema Rengi</label>
+                        <div class="flex items-center gap-2">
+                            <input id="d-renk" type="color" class="w-11 h-11 rounded-lg bg-transparent border border-white/10 cursor-pointer p-1">
+                            <input id="d-renk-hex" class="alan" maxlength="7">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="firmaDuzenleKaydet()" id="duzenle-btn"
+                        class="marka-gradyan w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/30 hover:opacity-90 transition">
+                    KAYDET
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ PERSONEL / ŞİFRE MODALI ============ -->
     <div id="personel-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div class="cam rounded-3xl w-full max-w-lg p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -203,15 +247,49 @@
         }
 
         // ---- Firma listesi ----
+        let _firmalar = [];
+
         async function firmalariYukle() {
             try {
-                const d = await istek({ islem: 'listele' });
-                const kap = $('firma-liste');
-                if (!d.firmalar?.length) {
-                    kap.innerHTML = '<div class="cam rounded-2xl p-6 text-white/40 text-sm">Henüz firma yok. "+ Yeni Firma" ile ilkini kur.</div>';
-                    return;
-                }
-                kap.innerHTML = d.firmalar.map((f) => {
+                const [d, o] = await Promise.all([
+                    istek({ islem: 'listele' }),
+                    istek({ islem: 'ozet' }).catch(() => null),
+                ]);
+                _firmalar = d.firmalar || [];
+                if (o && o.ozet) ozetCiz(o.ozet);
+                firmalariCiz();
+            } catch (e) {
+                mesaj(e.message, true);
+            }
+        }
+
+        // Platform geneli sayı kartları
+        function ozetCiz(oz) {
+            const kart = (deger, etiket) => `
+                <div class="cam rounded-2xl px-4 py-3">
+                    <p class="text-xl font-extrabold leading-tight">${deger}</p>
+                    <p class="text-[11px] text-white/40 mt-0.5">${etiket}</p>
+                </div>`;
+            $('ozet-satir').innerHTML =
+                kart(`${oz.firma_aktif}/${oz.firma_toplam}`, 'Aktif / toplam firma') +
+                kart(oz.personel_toplam, 'Personel') +
+                kart(oz.site_toplam, 'Tesis') +
+                kart(`${oz.is_emri_tamamlanan}/${oz.is_emri_toplam}`, 'Tamamlanan / toplam iş emri') +
+                kart(oz.acik_ariza, 'Açık arıza');
+        }
+
+        // Arama filtresiyle firma kartlarını çizer
+        function firmalariCiz() {
+            const kap = $('firma-liste');
+            const aranan = ($('ara').value || '').toLocaleLowerCase('tr');
+            const liste = _firmalar.filter((f) => !aranan
+                || (f.ad || '').toLocaleLowerCase('tr').includes(aranan)
+                || (f.firma_kodu || '').toLocaleLowerCase('tr').includes(aranan));
+            if (!liste.length) {
+                kap.innerHTML = `<div class="cam rounded-2xl p-6 text-white/40 text-sm">${_firmalar.length ? 'Aramaya uyan firma yok.' : 'Henüz firma yok. "+ Yeni Firma" ile ilkini kur.'}</div>`;
+                return;
+            }
+            kap.innerHTML = liste.map((f) => {
                     const logoUrl = f.logo
                         ? (/^https?:/.test(f.logo) ? f.logo : `${SUPABASE_URL}/storage/v1/object/public/${f.logo}`)
                         : null;
@@ -241,17 +319,21 @@
                                 class="marka-gradyan w-full py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 hover:opacity-90 transition mb-2">
                             Panele Gir (yönetici olarak)
                         </button>
-                        <div class="flex gap-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="duzenleAc(${Number(f.id)})"
+                                    class="py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
+                                Düzenle
+                            </button>
                             <button onclick="logoSec(${Number(f.id)})"
-                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
-                                ${logoUrl ? 'Logo' : 'Logo Yükle'}
+                                    class="py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
+                                ${logoUrl ? 'Logoyu Değiştir' : 'Logo Yükle'}
                             </button>
                             <button onclick="personelGoster(${Number(f.id)}, '${esc(f.ad).replace(/'/g, "\\'")}')"
-                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
-                                Personel
+                                    class="py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
+                                Personel &amp; Şifre
                             </button>
                             <button onclick="durumDegistir(${Number(f.id)}, ${f.aktif ? 'false' : 'true'}, '${esc(f.ad).replace(/'/g, "\\'")}')"
-                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
+                                    class="py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
                                         ? 'border-red-500/30 text-red-300 hover:bg-red-500/10'
                                         : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'}">
                                 ${f.aktif ? 'Pasifleştir' : 'Aktifleştir'}
@@ -409,6 +491,47 @@
                 _logoHedefFirma = null;
             }
         });
+
+        // ---- Firma bilgilerini düzenleme (ad / kod / renk) ----
+        function duzenleAc(firmaId) {
+            const f = _firmalar.find((x) => String(x.id) === String(firmaId));
+            if (!f) return;
+            $('d-id').value = f.id;
+            $('d-ad').value = f.ad || '';
+            $('d-kod').value = f.firma_kodu || '';
+            const renk = /^#[0-9A-Fa-f]{6}$/.test(f.hex_color || '') ? f.hex_color : '#3B82F6';
+            $('d-renk').value = renk;
+            $('d-renk-hex').value = renk.toUpperCase();
+            $('duzenle-hata').classList.add('hidden');
+            $('duzenle-modal').classList.remove('hidden');
+        }
+        $('d-renk').addEventListener('input', (e) => { $('d-renk-hex').value = e.target.value.toUpperCase(); });
+        $('d-renk-hex').addEventListener('input', (e) => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) $('d-renk').value = e.target.value;
+        });
+
+        async function firmaDuzenleKaydet() {
+            const btn = $('duzenle-btn');
+            btn.disabled = true; btn.textContent = 'KAYDEDİLİYOR…';
+            try {
+                const d = await istek({
+                    islem: 'duzenle',
+                    firma_id: Number($('d-id').value),
+                    ad: $('d-ad').value.trim(),
+                    firma_kodu: $('d-kod').value.trim().toUpperCase(),
+                    hex_color: $('d-renk-hex').value.trim(),
+                });
+                $('duzenle-modal').classList.add('hidden');
+                mesaj(d.message, false);
+                firmalariYukle();
+            } catch (e) {
+                const kutu = $('duzenle-hata');
+                kutu.textContent = e.message;
+                kutu.classList.remove('hidden');
+            } finally {
+                btn.disabled = false; btn.textContent = 'KAYDET';
+            }
+        }
 
         // ---- Yeni firma ----
         function modalAc() { $('modal').classList.remove('hidden'); $('modal-hata').classList.add('hidden'); }

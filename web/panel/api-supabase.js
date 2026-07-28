@@ -121,22 +121,6 @@ function firmaLogoUrl(stored) {
     return `${SUPABASE_URL}/storage/v1/object/public/${stored}`;
 }
 
-// Logo dosyasını Storage'a yükler; DB'de saklanacak "firma-logo/..." yolu döner.
-async function firmaLogoYukle(firmaId, file) {
-    const uzanti = (file.name.split('.').pop() || 'png').toLowerCase();
-    const yol = `firma-logo/${firmaId}/logo_${Date.now()}.${uzanti}`;
-    const res = await _sbFetch(`/storage/v1/object/${yol}`, {
-        method: 'POST',
-        headers: { 'Content-Type': file.type || 'image/png' },
-        body: file,
-    });
-    if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.message || 'Logo yüklenemedi.');
-    }
-    return yol;
-}
-
 // ---- Yardımcılar: PHP gövdesindeki serbest tipleri RPC tiplerine çevir ----
 const _int = (v) => (v === undefined || v === null || v === '' ? null : parseInt(v, 10));
 const _num = (v) => (v === undefined || v === null || v === '' ? null : parseFloat(v));
@@ -178,17 +162,8 @@ async function apiFetch(path, options = {}) {
                 return _rpcYanit(r);
             }
 
-            // ---------------- FİRMA AYARLARI ----------------
+            // ---------------- FİRMA BİLGİSİ (salt okunur; ayarlar süper admin panelinde) ----------------
             case 'admin/firma.php': {
-                if (options.method === 'POST') {
-                    const r = await _sbRpc('admin_firma_guncelle', {
-                        p_ad: _str(govde.ad),
-                        p_hex_color: _str(govde.hex_color),
-                        p_logo_path: _str(govde.logo),
-                        p_logo_set: 'logo' in govde,
-                    });
-                    return _rpcYanit(r);
-                }
                 // RLS zaten yalnız kendi firmayı gösterir.
                 const rows = await _sbList('firmalar?select=*&limit=1');
                 return _yanit(true, 200, { data: rows[0] || null });
