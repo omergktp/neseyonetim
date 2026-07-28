@@ -17,6 +17,10 @@
 //   { islem: "logo", firma_id, logo_base64, logo_tip }   — logo yükle/değiştir
 //   { islem: "logo", firma_id, kaldir: true }            — logoyu kaldır
 //   { islem: "durum", firma_id, aktif }
+//   { islem: "oturum", firma_id }        — firmanın yöneticisi olarak panel
+//                                          oturumu üret (destek/impersonation)
+//   { islem: "personeller", firma_id }   — firmanın personel listesi
+//   { islem: "sifre", personel_id, yeni_sifre } — personel şifresi sıfırla
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs@2.4.3";
@@ -240,6 +244,146 @@ Deno.serve(async (req) => {
     } catch (e) {
       return json({ message: (e as Error).message }, 422);
     }
+  }
+
+  // ---------------- OTURUM (firmanın yöneticisi olarak panele gir) ----------------
+  // login fonksiyonuyla aynı gölge-kullanıcı akışı: yönetici personel bulunur,
+  // GoTrue kullanıcısı hazırlanır, magiclink token'ı sunucuda doğrulanıp
+  // GERÇEK bir oturum döndürülür. Panel bu yanıtı normal giriş gibi kullanır.
+  if (islem === "oturum") {
+    const firmaId = Number(body.firma_id);
+    if (!Number.isInteger(firmaId) || firmaId <= 0) {
+      return json({ message: "Geçersiz firma_id." }, 422);
+    }
+
+    const { data: firma } = await admin
+      .from("firmalar")
+      .select("id, ad, logo, hex_color, aktif")
+      .eq("id", firmaId)
+      .maybeSingle();
+    if (!firma) return json({ message: "Firma bulunamadı." }, 404);
+
+    const { data: yonetici } = await admin
+      .from("personeller")
+      .select("id, ad_soyad, rol, auth_user_id")
+      .eq("firma_id", firmaId)
+      .eq("rol", "yonetici")
+      .eq("aktif", true)
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!yonetici) return json({ message: "Firmada aktif yönetici yok." }, 404);
+
+    const appMeta = {
+      firma_id: String(firma.id),
+      personel_id: String(yonetici.id),
+      rol: yonetici.rol,
+    };
+
+    let authUserId: string | null = yonetici.auth_user_id;
+    let email: string | null = null;
+
+    if (!authUserId) {
+      email = `p-${crypto.randomUUID()}@personel.glowsaha.app`;
+      const { data: created, error: cErr } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        app_metadata: appMeta,
+      });
+      if (cErr || !created?.user) return json({ message: "Oturum açılamadı." }, 500);
+      authUserId = created.user.id;
+      const { error: bErr } = await admin
+        .from("personeller")
+        .update({ auth_user_id: authUserId })
+        .eq("id", yonetici.id);
+      if (bErr) return json({ message: "Oturum açılamadı." }, 500);
+    } else {
+      const { data: mevcut, error: gErr } = await admin.auth.admin.getUserById(authUserId);
+      if (gErr || !mevcut?.user) return json({ message: "Oturum açılamadı." }, 500);
+      email = mevcut.user.email ?? null;
+      if (!email) return json({ message: "Oturum açılamadı." }, 500);
+    }
+
+    const { error: uErr } = await admin.auth.admin.updateUserById(authUserId!, {
+      app_metadata: appMeta,
+    });
+    if (uErr) return json({ message: "Oturum açılamadı." }, 500);
+
+    const { data: link, error: lErr } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: email!,
+    });
+    if (lErr || !link?.properties?.hashed_token) {
+      return json({ message: "Oturum açılamadı." }, 500);
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const verifyRes = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
+      },
+      body: JSON.stringify({ type: "magiclink", token_hash: link.properties.hashed_token }),
+    });
+    if (!verifyRes.ok) return json({ message: "Oturum açılamadı." }, 500);
+    const session = await verifyRes.json();
+
+    const logoUrl = firma.logo
+      ? (/^https?:/.test(firma.logo)
+        ? firma.logo
+        : `${supabaseUrl}/storage/v1/object/public/${firma.logo}`)
+      : null;
+
+    // Panel login yanıtıyla birebir aynı şekil (index.html'in beklediği alanlar).
+    return json({
+      message: "Destek oturumu üretildi.",
+      access_token: session.access_token,
+      refresh_token: session.refresh_token ?? null,
+      kullanici: { ad_soyad: `${yonetici.ad_soyad} (destek)`, rol: yonetici.rol },
+      firma: { ad: firma.ad, logo: firma.logo, logo_url: logoUrl, tema_rengi: firma.hex_color },
+    });
+  }
+
+  // ---------------- PERSONELLER (firmanın kullanıcı listesi) ----------------
+  if (islem === "personeller") {
+    const firmaId = Number(body.firma_id);
+    if (!Number.isInteger(firmaId) || firmaId <= 0) {
+      return json({ message: "Geçersiz firma_id." }, 422);
+    }
+    const { data, error } = await admin
+      .from("personeller")
+      .select("id, ad_soyad, telefon, rol, aktif")
+      .eq("firma_id", firmaId)
+      .order("rol", { ascending: true })
+      .order("ad_soyad", { ascending: true });
+    if (error) return json({ message: "Personel listesi okunamadı." }, 500);
+    return json({ personeller: data ?? [] });
+  }
+
+  // ---------------- ŞİFRE (personel şifresi sıfırla) ----------------
+  if (islem === "sifre") {
+    const personelId = Number(body.personel_id);
+    const yeniSifre = (body.yeni_sifre ?? "").toString();
+    if (!Number.isInteger(personelId) || personelId <= 0) {
+      return json({ message: "Geçersiz personel_id." }, 422);
+    }
+    if (yeniSifre.length < 10) {
+      return json({ message: "Şifre en az 10 karakter olmalı." }, 422);
+    }
+    const { data: p } = await admin
+      .from("personeller")
+      .select("id, ad_soyad")
+      .eq("id", personelId)
+      .maybeSingle();
+    if (!p) return json({ message: "Personel bulunamadı." }, 404);
+
+    const { error } = await admin
+      .from("personeller")
+      .update({ sifre: bcrypt.hashSync(yeniSifre, 10) })
+      .eq("id", personelId);
+    if (error) return json({ message: "Şifre güncellenemedi." }, 500);
+    return json({ message: `${p.ad_soyad} için şifre güncellendi.` });
   }
 
   // ---------------- DURUM (aktif / pasif) ----------------

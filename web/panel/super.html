@@ -133,6 +133,19 @@
     <!-- Kart üzerinden logo değiştirme için gizli dosya seçici -->
     <input id="logo-degistir-dosya" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
 
+    <!-- ============ PERSONEL / ŞİFRE MODALI ============ -->
+    <div id="personel-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="cam rounded-3xl w-full max-w-lg p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="text-lg font-bold" id="personel-baslik">Personeller</h2>
+                <button onclick="document.getElementById('personel-modal').classList.add('hidden')" class="text-white/40 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <p class="text-xs text-white/40 mb-4">Şifre sıfırlayınca yeni şifre bir kez gösterilir — kopyalayıp firmaya ilet.</p>
+            <div id="personel-sonuc" class="hidden mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-3 text-sm text-emerald-300"></div>
+            <div id="personel-liste" class="space-y-2"></div>
+        </div>
+    </div>
+
     <script>
         // Supabase bağlantısı (api-supabase.js ile aynı proje)
         const SUPABASE_URL = 'https://bfkiifbzxwhbviluyzcp.supabase.co';
@@ -224,10 +237,18 @@
                             <span>${f.site_sayisi} tesis</span>
                             <span class="ml-auto">${esc(tarih)}</span>
                         </div>
+                        <button onclick="panelGir(${Number(f.id)})"
+                                class="marka-gradyan w-full py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 hover:opacity-90 transition mb-2">
+                            Panele Gir (yönetici olarak)
+                        </button>
                         <div class="flex gap-2">
                             <button onclick="logoSec(${Number(f.id)})"
                                     class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
-                                ${logoUrl ? 'Logoyu Değiştir' : 'Logo Yükle'}
+                                ${logoUrl ? 'Logo' : 'Logo Yükle'}
+                            </button>
+                            <button onclick="personelGoster(${Number(f.id)}, '${esc(f.ad).replace(/'/g, "\\'")}')"
+                                    class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-white/70 hover:bg-white/10 transition">
+                                Personel
                             </button>
                             <button onclick="durumDegistir(${Number(f.id)}, ${f.aktif ? 'false' : 'true'}, '${esc(f.ad).replace(/'/g, "\\'")}')"
                                     class="flex-1 py-2.5 rounded-xl text-xs font-bold border transition ${f.aktif
@@ -240,6 +261,81 @@
                 }).join('');
             } catch (e) {
                 mesaj(e.message, true);
+            }
+        }
+
+        // ---- Panele gir (impersonation): firmanın yöneticisi olarak oturum aç ----
+        async function panelGir(firmaId) {
+            try {
+                const d = await istek({ islem: 'oturum', firma_id: firmaId });
+                // Panel login'inin yazdığı anahtarların birebir aynısı — dashboard
+                // normal yönetici oturumu gibi açılır. (Not: aynı tarayıcıdaki
+                // mevcut panel oturumunun yerine geçer.)
+                localStorage.setItem('glow_token', d.access_token);
+                if (d.refresh_token) localStorage.setItem('glow_refresh', d.refresh_token);
+                else localStorage.removeItem('glow_refresh');
+                localStorage.setItem('glow_user', JSON.stringify(d.kullanici));
+                if (d.firma) localStorage.setItem('glow_firma', JSON.stringify(d.firma));
+                window.open('dashboard.html', '_blank');
+            } catch (e) { mesaj(e.message, true); }
+        }
+
+        // ---- Personel listesi + şifre sıfırlama ----
+        const ROL_ETIKET = { yonetici: 'Yönetici', teknik: 'Teknik', saha: 'Saha', temizlik: 'Temizlik', guvenlik: 'Güvenlik' };
+
+        async function personelGoster(firmaId, firmaAd) {
+            $('personel-baslik').textContent = `${firmaAd} — Personeller`;
+            $('personel-sonuc').classList.add('hidden');
+            $('personel-liste').innerHTML = '<p class="text-white/40 text-sm">Yükleniyor…</p>';
+            $('personel-modal').classList.remove('hidden');
+            try {
+                const d = await istek({ islem: 'personeller', firma_id: firmaId });
+                if (!d.personeller?.length) {
+                    $('personel-liste').innerHTML = '<p class="text-white/40 text-sm">Personel yok.</p>';
+                    return;
+                }
+                $('personel-liste').innerHTML = d.personeller.map((p) => `
+                    <div class="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 ${p.aktif ? '' : 'opacity-50'}">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold truncate">${esc(p.ad_soyad)} ${p.aktif ? '' : '<span class="text-red-300 text-[10px]">(pasif)</span>'}</p>
+                            <p class="text-xs text-white/40">${esc(ROL_ETIKET[p.rol] || p.rol)} · ${esc(p.telefon)}</p>
+                        </div>
+                        <button onclick="sifreSifirla(${Number(p.id)}, '${esc(p.ad_soyad).replace(/'/g, "\\'")}')"
+                                class="shrink-0 px-3 py-2 rounded-lg text-[11px] font-bold border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition">
+                            Şifre Sıfırla
+                        </button>
+                    </div>`).join('');
+            } catch (e) {
+                $('personel-liste').innerHTML = `<p class="text-red-300 text-sm">${esc(e.message)}</p>`;
+            }
+        }
+
+        // Okunması kolay, karışmayan karakterlerle 12 haneli rastgele şifre.
+        function rastgeleSifre() {
+            const harfler = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            const rnd = new Uint32Array(12);
+            crypto.getRandomValues(rnd);
+            let s = '';
+            for (let i = 0; i < 12; i++) s += harfler[rnd[i] % harfler.length];
+            return s;
+        }
+
+        async function sifreSifirla(personelId, ad) {
+            if (!confirm(`${ad} için yeni şifre üretilsin mi? Eski şifre anında geçersiz olur.`)) return;
+            const yeni = rastgeleSifre();
+            try {
+                const d = await istek({ islem: 'sifre', personel_id: personelId, yeni_sifre: yeni });
+                const kutu = $('personel-sonuc');
+                kutu.className = 'mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-3 text-sm text-emerald-300';
+                kutu.innerHTML = `${esc(d.message)} Yeni şifre: <b class="font-mono select-all">${esc(yeni)}</b>
+                    <button onclick="navigator.clipboard.writeText('${esc(yeni)}').then(()=>{this.textContent='Kopyalandı ✓'})"
+                            class="ml-2 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 transition">Kopyala</button>`;
+                kutu.classList.remove('hidden');
+            } catch (e) {
+                const kutu = $('personel-sonuc');
+                kutu.className = 'mb-4 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-sm text-red-300';
+                kutu.textContent = e.message;
+                kutu.classList.remove('hidden');
             }
         }
 
