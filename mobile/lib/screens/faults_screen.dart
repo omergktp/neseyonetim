@@ -7,6 +7,7 @@ import '../services/camera_service.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 import 'expense_screen.dart';
 import 'camera_capture_screen.dart';
 
@@ -53,7 +54,13 @@ class _FaultsScreenState extends State<FaultsScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? SkeletonPulse(
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: const [SkeletonCard(), SkeletonCard(), SkeletonCard()],
+                ),
+              )
             : _faults.isEmpty
                 ? AppTheme.emptyState(
                     icon: Icons.handyman_outlined,
@@ -67,7 +74,9 @@ class _FaultsScreenState extends State<FaultsScreen> {
                     itemBuilder: (context, i) {
                       final a = _faults[i];
                       final bekliyor = a['durum'] == 'bekliyor';
-                      return Container(
+                      return FadeSlideIn(
+                        index: i,
+                        child: Container(
                         margin: const EdgeInsets.only(bottom: 14),
                         decoration: AppTheme.cardDecoration,
                         child: Material(
@@ -112,6 +121,7 @@ class _FaultsScreenState extends State<FaultsScreen> {
                               ),
                             ),
                           ),
+                        ),
                         ),
                       );
                     },
@@ -308,28 +318,25 @@ class _FaultDetailScreenState extends State<FaultDetailScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: SizedBox(
+                        child: GradientButton(
+                          onPressed: () => _updateStatus('cozuldu'),
+                          seed: Theme.of(context).colorScheme.primary,
                           height: 50,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _updateStatus('cozuldu'),
-                            icon: const Icon(Icons.check_circle),
-                            label: const Text('Çözüldü'),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white),
-                          ),
+                          icon: Icons.check_circle,
+                          label: 'Çözüldü',
+                          colors: const [AppTheme.success, Color(0xFF15803D)],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
+                  GradientButton(
+                    onPressed: () => _updateStatus('dis_destek'),
+                    seed: Theme.of(context).colorScheme.primary,
                     height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _updateStatus('dis_destek'),
-                      icon: const Icon(Icons.engineering),
-                      label: const Text('Çözülemedi – Dış Destek Gerekli'),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info, foregroundColor: Colors.white),
-                    ),
+                    icon: Icons.engineering,
+                    label: 'Çözülemedi – Dış Destek Gerekli',
+                    colors: const [AppTheme.info, Color(0xFF5B21B6)],
                   ),
                 ],
               ),

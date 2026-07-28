@@ -10,6 +10,7 @@ import '../services/offline_queue.dart';
 import '../services/sync_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 
 class ReportFaultScreen extends StatefulWidget {
   const ReportFaultScreen({super.key});
@@ -220,7 +221,8 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
           ? AppTheme.loadingBox('Arıza bildiriliyor...', color: AppTheme.danger)
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(
+              child: FadeSlideIn(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Bilgilendirme paneli — AppTheme.infoPanel ile standardize
@@ -340,21 +342,16 @@ class _ReportFaultScreenState extends State<ReportFaultScreen> {
                     ),
 
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
+                  GradientButton(
+                    onPressed: _submit,
+                    seed: seed,
                     height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: _submit,
-                      icon: const Icon(Icons.report_problem),
-                      label: const Text('Arızayı Bildir', style: TextStyle(fontSize: 16)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.danger,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
+                    icon: Icons.report_problem,
+                    label: 'Arızayı Bildir',
+                    colors: const [AppTheme.danger, Color(0xFF991B1B)],
                   ),
                 ],
+                ),
               ),
             ),
     );

@@ -29,15 +29,25 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   // arka plan blobları ve buton gradyanı bu renkten türetilir.
   Color _seed = const Color(0xFF3B82F6);
 
+  // "Uygulama firmanınmış" hissi: bu cihazda daha önce giriş yapıldıysa
+  // login ekranı jenerik marka yerine firmanın logosu ve adıyla açılır.
+  String? _firmaLogoUrl;
+  String? _firmaAd;
+
   @override
   void initState() {
     super.initState();
 
     SharedPreferences.getInstance().then((prefs) {
+      if (!mounted) return;
       final hex = prefs.getString('theme_color');
-      if (hex != null && mounted) {
-        setState(() => _seed = AppTheme.parseHex(hex));
-      }
+      final logo = prefs.getString('firma_logo_url');
+      final firmaAd = prefs.getString('firma_ad');
+      setState(() {
+        if (hex != null) _seed = AppTheme.parseHex(hex);
+        if (logo != null && logo.isNotEmpty) _firmaLogoUrl = logo;
+        if (firmaAd != null && firmaAd.trim().isNotEmpty) _firmaAd = firmaAd.trim();
+      });
     });
 
     // Arka plan animasyonu için kontrolcü
@@ -215,17 +225,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           child: child,
                         );
                       },
-                      child: const BrandLogo(size: 96),
+                      child: BrandLogo(size: 96, logoUrl: _firmaLogoUrl),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'GLOW SAHA',
-                      style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 2),
+                    Text(
+                      (_firmaAd ?? 'GLOW SAHA').toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Tesis ve Saha Yönetim Sistemi',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 16, letterSpacing: 0.5),
+                      _firmaAd == null
+                          ? 'Tesis ve Saha Yönetim Sistemi'
+                          : 'Glow Saha · Tesis ve Saha Yönetimi',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 15, letterSpacing: 0.5),
                     ),
                     const SizedBox(height: 48),
 

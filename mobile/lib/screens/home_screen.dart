@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/offline_queue.dart';
@@ -6,6 +7,7 @@ import '../services/sync_service.dart';
 import '../services/fcm_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 import 'login_screen.dart';
 import 'task_detail_screen.dart';
 import 'report_fault_screen.dart';
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _faultsLoading = false;
 
   String? _rol; // teknik ise sekmeli (Görevlerim / Arızalarım) görünüm
+  String _ad = ''; // hero başlıktaki kişisel karşılama için (ad_soyad'ın ilk kelimesi)
 
   @override
   void initState() {
@@ -40,6 +43,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() => _rol = r);
       if (r == 'teknik') _loadFaults();
+    });
+    SharedPreferences.getInstance().then((prefs) {
+      final adSoyad = (prefs.getString('ad_soyad') ?? '').trim();
+      if (adSoyad.isNotEmpty && mounted) {
+        setState(() => _ad = adSoyad.split(' ').first);
+      }
     });
     _loadTasks();
   }
@@ -196,7 +205,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await FcmService.clearToken();
     final prefs = await SharedPreferences.getInstance();
+    // Marka bilgileri (renk/ad/logo) çıkışta korunur: login ekranı firmanın
+    // kimliğiyle açılmaya devam eder ("uygulama bizim" hissi).
+    final tema = prefs.getString('theme_color');
+    final firmaAd = prefs.getString('firma_ad');
+    final logo = prefs.getString('firma_logo_url');
     await prefs.clear();
+    if (tema != null) await prefs.setString('theme_color', tema);
+    if (firmaAd != null) await prefs.setString('firma_ad', firmaAd);
+    if (logo != null) await prefs.setString('firma_logo_url', logo);
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
@@ -212,156 +229,235 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // FAB firma rengini kullanır; kırmızı yalnızca gerçekten yıkıcı işlemlere saklanır
     // (firma rengi kırmızı/turuncu olan tenant'larda görsel çakışmayı da önler).
-    final fab = FloatingActionButton.extended(
-      onPressed: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportFaultScreen()));
-      },
-      backgroundColor: primaryColor,
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.report_problem),
-      label: const Text('Arıza Bildir'),
-    );
-
-    final actions = [
-      // Dead-letter uyarısı: sunucunun reddettiği kayıtlar sessizce kaybolmaz.
-      if (_olenKayit > 0)
-        IconButton(
-          icon: Badge(
-            label: Text('$_olenKayit'),
-            backgroundColor: Colors.red,
-            child: const Icon(Icons.error_outline),
-          ),
-          tooltip: 'Gönderilemeyen kayıtlar',
-          onPressed: _olenKayitlariGoster,
-        ),
-      // Offline kuyruk rozeti: personel "kaydım kayboldu mu?" endişesi yaşamasın.
-      if (_bekleyenKuyruk > 0)
-        IconButton(
-          icon: Badge(
-            label: Text('$_bekleyenKuyruk'),
-            child: const Icon(Icons.cloud_upload_outlined),
-          ),
-          tooltip: 'Gönderilmeyi bekleyen kayıtlar',
-          onPressed: () {
-            UiUtils.showSnackBar(
-                '$_bekleyenKuyruk kayıt cihazda güvende; internet gelince otomatik gönderilecek.');
-          },
-        ),
-      IconButton(
-        icon: const Icon(Icons.refresh),
-        tooltip: 'Yenile',
-        onPressed: () {
-          _loadTasks();
-          if (_rol == 'teknik') _loadFaults();
-        },
-      ),
-      IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
-    ];
+    final fab = _gradientFab(primaryColor);
 
     // TEKNİK: sekmeli görünüm (Görevlerim / Arızalarım)
     if (_rol == 'teknik') {
       return DefaultTabController(
         length: 2,
-        child: Scaffold(
-          floatingActionButton: fab,
-          appBar: AppBar(
-            title: const Text('Glow Saha', style: TextStyle(fontWeight: FontWeight.bold)),
-            backgroundColor: primaryColor,
-            flexibleSpace: AppTheme.appBarFlex(primaryColor),
-            actions: actions,
-            bottom: const TabBar(
-              indicatorColor: Colors.white,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              tabs: [
-                Tab(icon: Icon(Icons.assignment), text: 'Görevlerim'),
-                Tab(icon: Icon(Icons.handyman), text: 'Arızalarım'),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: Scaffold(
+            floatingActionButton: fab,
+            body: Column(
+              children: [
+                HeroHeader(
+                  seed: primaryColor,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _heroTitleRow(),
+                      const SizedBox(height: 14),
+                      _heroStats(),
+                      const SizedBox(height: 12),
+                      _heroTabBar(),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildTasksBody(primaryColor),
+                      _buildFaultsBody(primaryColor),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-          body: TabBarView(
-            children: [
-              _buildTasksBody(primaryColor),
-              _buildFaultsBody(primaryColor),
-            ],
           ),
         ),
       );
     }
 
     // DİĞER ROLLER: sadece görev listesi
-    return Scaffold(
-      floatingActionButton: fab,
-      appBar: AppBar(
-        title: const Text('İş Emirlerim', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: primaryColor,
-        flexibleSpace: AppTheme.appBarFlex(primaryColor),
-        actions: actions,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        floatingActionButton: fab,
+        body: Column(
+          children: [
+            HeroHeader(
+              seed: primaryColor,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _heroTitleRow(),
+                  const SizedBox(height: 16),
+                  _heroStats(),
+                ],
+              ),
+            ),
+            Expanded(child: _buildTasksBody(primaryColor)),
+          ],
+        ),
       ),
-      body: _buildTasksBody(primaryColor),
     );
   }
 
-  // ---- "Bugün" özet şeridi (görev listesinin üstünde) ----
-  Widget _ozetSerit(Color primary) {
-    final toplam = _tasks.length;
+  // ---- Hero başlık içeriği ----
+
+  // Üst satır: tarih + kişisel karşılama solda, aksiyon ikonları sağda.
+  Widget _heroTitleRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                turkceTarih(DateTime.now()).toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _ad.isEmpty ? 'İş Emirlerim' : 'Merhaba, $_ad 👋',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Dead-letter uyarısı: sunucunun reddettiği kayıtlar sessizce kaybolmaz.
+        if (_olenKayit > 0)
+          _heroIcon(
+            tooltip: 'Gönderilemeyen kayıtlar',
+            onTap: _olenKayitlariGoster,
+            child: Badge(
+              label: Text('$_olenKayit'),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.error_outline, color: Colors.white, size: 22),
+            ),
+          ),
+        // Offline kuyruk rozeti: personel "kaydım kayboldu mu?" endişesi yaşamasın.
+        if (_bekleyenKuyruk > 0)
+          _heroIcon(
+            tooltip: 'Gönderilmeyi bekleyen kayıtlar',
+            onTap: () {
+              UiUtils.showSnackBar(
+                  '$_bekleyenKuyruk kayıt cihazda güvende; internet gelince otomatik gönderilecek.');
+            },
+            child: Badge(
+              label: Text('$_bekleyenKuyruk'),
+              child: const Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 22),
+            ),
+          ),
+        _heroIcon(
+          tooltip: 'Yenile',
+          onTap: () {
+            _loadTasks();
+            if (_rol == 'teknik') _loadFaults();
+          },
+          child: const Icon(Icons.refresh, color: Colors.white, size: 22),
+        ),
+        _heroIcon(
+          tooltip: 'Çıkış',
+          onTap: _logout,
+          child: const Icon(Icons.logout, color: Colors.white, size: 20),
+        ),
+      ],
+    );
+  }
+
+  // Hero üstündeki yuvarlak cam aksiyon butonu.
+  Widget _heroIcon({required Widget child, required VoidCallback onTap, String? tooltip}) {
+    final buton = Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.14),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(width: 40, height: 40, child: Center(child: child)),
+        ),
+      ),
+    );
+    return tooltip == null ? buton : Tooltip(message: tooltip, child: buton);
+  }
+
+  // "Bugünün işleri" cam istatistik kutuları (hero içinde).
+  Widget _heroStats() {
     final devam = _tasks.where((t) => t['durum'] == 'devam_ediyor').length;
     final bekleyen = _tasks.where((t) => t['durum'] == 'bekliyor').length;
+    return Row(
+      children: [
+        GlassStat(value: '$devam', label: 'Devam eden', icon: Icons.play_circle_fill),
+        const SizedBox(width: 10),
+        GlassStat(value: '$bekleyen', label: 'Bekleyen', icon: Icons.schedule),
+        const SizedBox(width: 10),
+        GlassStat(value: '$_bugunTamamlanan', label: 'Bugün biten', icon: Icons.check_circle),
+      ],
+    );
+  }
+
+  // Teknik roldeki sekmeler: hero içinde hap (pill) görünümlü TabBar.
+  Widget _heroTabBar() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primary, Color.lerp(primary, Colors.black, 0.28)!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.cardShadow,
+        color: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.today, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
-              const Text('Bugünün İşleri', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-              const Spacer(),
-              Text('$toplam görev', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _miniStat(devam.toString(), 'Devam eden', Icons.play_circle_fill),
-              const SizedBox(width: 10),
-              _miniStat(bekleyen.toString(), 'Bekleyen', Icons.schedule),
-              const SizedBox(width: 10),
-              _miniStat(_bugunTamamlanan.toString(), 'Bugün biten', Icons.check_circle),
-            ],
-          ),
+      child: TabBar(
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        labelStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+        tabs: const [
+          Tab(height: 44, icon: Icon(Icons.assignment, size: 18), text: 'Görevlerim'),
+          Tab(height: 44, icon: Icon(Icons.handyman, size: 18), text: 'Arızalarım'),
         ],
       ),
     );
   }
 
-  Widget _miniStat(String deger, String etiket, IconData ikon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            Icon(ikon, color: Colors.white, size: 18),
-            const SizedBox(height: 6),
-            Text(deger, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 2),
-            Text(etiket, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
-          ],
+  // Arıza bildir: marka gradyanlı özel FAB.
+  Widget _gradientFab(Color primary) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppTheme.brandGradient(primary),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: primary.withValues(alpha: 0.45), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => const ReportFaultScreen()));
+          },
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.report_problem, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Arıza Bildir',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -405,13 +501,111 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // Tek görev kartı: ikonlu avatar + başlık + tesis + durum + ilerleme + eylem.
+  Widget _taskCard(dynamic task, int index, Color primary) {
+    final devam = task['durum'] == 'devam_ediyor';
+    final grad = AppTheme.brandGradient(primary);
+    void ac() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => TaskDetailScreen(task: task)),
+      ).then((value) => _loadTasks());
+    }
+
+    return FadeSlideIn(
+      index: index,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: AppTheme.cardDecoration,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: ac,
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: grad.colors.map((c) => c.withValues(alpha: 0.14)).toList(),
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(devam ? Icons.autorenew : Icons.assignment_outlined,
+                            color: devam ? AppTheme.warning : primary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task['baslik'] ?? 'Başlıksız Görev',
+                              style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textMuted),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    task['site_adi'] ?? 'Belirtilmemiş Tesis',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      StatusUi.chip(task['durum']),
+                    ],
+                  ),
+                  _checklistProgress(task, primary),
+                  const SizedBox(height: 16),
+                  GradientButton(
+                    onPressed: ac,
+                    seed: primary,
+                    height: 46,
+                    icon: devam ? Icons.arrow_forward : Icons.play_arrow,
+                    label: devam ? 'Göreve Devam Et' : 'Görevi Başlat',
+                    colors: devam ? const [AppTheme.warning, Color(0xFFB45309)] : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ---- Görev listesi ----
   Widget _buildTasksBody(Color primaryColor) {
     return RefreshIndicator(
       onRefresh: _loadTasks,
       color: primaryColor,
       child: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? SkeletonPulse(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: const [SkeletonCard(), SkeletonCard(), SkeletonCard(), SkeletonCard()],
+              ),
+            )
           : _tasks.isEmpty
               ? (_yuklemeHatasi != null
                   ? AppTheme.emptyState(
@@ -429,70 +623,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
-                  itemCount: _tasks.length + 1, // 0: özet şeridi
-                  itemBuilder: (context, index) {
-                    if (index == 0) return _ozetSerit(primaryColor);
-                    final task = _tasks[index - 1];
-                    final devam = task['durum'] == 'devam_ediyor';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: AppTheme.cardDecoration,
-                      child: Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    task['baslik'] ?? 'Başlıksız Görev',
-                                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textDark),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                StatusUi.chip(task['durum']),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_outlined, size: 16, color: AppTheme.textMuted),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    task['site_adi'] ?? 'Belirtilmemiş Tesis',
-                                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            _checklistProgress(task, primaryColor),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 46,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => TaskDetailScreen(task: task)),
-                                  ).then((value) => _loadTasks());
-                                },
-                                icon: Icon(devam ? Icons.arrow_forward : Icons.play_arrow, size: 20),
-                                label: Text(devam ? 'Göreve Devam Et' : 'Görevi Başlat'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: devam ? AppTheme.warning : primaryColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                  itemCount: _tasks.length,
+                  itemBuilder: (context, index) =>
+                      _taskCard(_tasks[index], index, primaryColor),
                 ),
     );
   }
@@ -503,7 +636,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       onRefresh: _loadFaults,
       color: primaryColor,
       child: _faultsLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? SkeletonPulse(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: const [SkeletonCard(), SkeletonCard(), SkeletonCard()],
+              ),
+            )
           : _faults.isEmpty
               ? AppTheme.emptyState(
                   icon: Icons.handyman_outlined,
@@ -518,48 +657,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   itemBuilder: (context, i) {
                     final a = _faults[i];
                     final bekliyor = a['durum'] == 'bekliyor';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: AppTheme.cardDecoration,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => FaultDetailScreen(fault: a)),
-                            );
-                            _loadFaults();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 46,
-                                  height: 46,
-                                  decoration: BoxDecoration(
-                                      color: AppTheme.danger.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(14)),
-                                  child: Icon(bekliyor ? Icons.hourglass_bottom : Icons.warning_amber_rounded,
-                                      color: AppTheme.danger),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(a['baslik'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark)),
-                                      const SizedBox(height: 4),
-                                      Text(a['site_adi'] ?? 'Tesis', style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-                                      const SizedBox(height: 8),
-                                      StatusUi.chip(a['durum']),
-                                    ],
+                    return FadeSlideIn(
+                      index: i,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: AppTheme.cardDecoration,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => FaultDetailScreen(fault: a)),
+                              );
+                              _loadFaults();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 46,
+                                    height: 46,
+                                    decoration: BoxDecoration(
+                                        color: AppTheme.danger.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(14)),
+                                    child: Icon(bekliyor ? Icons.hourglass_bottom : Icons.warning_amber_rounded,
+                                        color: AppTheme.danger),
                                   ),
-                                ),
-                                const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-                              ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(a['baslik'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark)),
+                                        const SizedBox(height: 4),
+                                        Text(a['site_adi'] ?? 'Tesis', style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                                        const SizedBox(height: 8),
+                                        StatusUi.chip(a['durum']),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                                ],
+                              ),
                             ),
                           ),
                         ),

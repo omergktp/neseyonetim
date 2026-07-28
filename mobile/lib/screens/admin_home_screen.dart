@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
@@ -6,6 +7,7 @@ import '../services/fcm_service.dart';
 import '../services/offline_queue.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 import 'login_screen.dart';
 
 /// Yönetici mobil görünümü: telefondan firma özeti, masraf onayı ve arıza takibi.
@@ -80,7 +82,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (onay != true) return;
     await FcmService.clearToken();
     final prefs = await SharedPreferences.getInstance();
+    // Marka bilgileri (renk/ad/logo) çıkışta korunur: login ekranı firmanın
+    // kimliğiyle açılmaya devam eder ("uygulama bizim" hissi).
+    final tema = prefs.getString('theme_color');
+    final firmaAd = prefs.getString('firma_ad');
+    final logo = prefs.getString('firma_logo_url');
     await prefs.clear();
+    if (tema != null) await prefs.setString('theme_color', tema);
+    if (firmaAd != null) await prefs.setString('firma_ad', firmaAd);
+    if (logo != null) await prefs.setString('firma_logo_url', logo);
     if (!mounted) return;
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
   }
@@ -146,40 +156,125 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Yönetici Paneli', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: _primary,
-          flexibleSpace: AppTheme.appBarFlex(_primary),
-          actions: [
-            IconButton(icon: const Icon(Icons.refresh), tooltip: 'Yenile', onPressed: _yukle),
-            IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
-          ],
-          bottom: TabBar(
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              const Tab(icon: Icon(Icons.dashboard_outlined), text: 'Özet'),
-              Tab(
-                icon: Badge(
-                  isLabelVisible: _masraflar.isNotEmpty,
-                  label: Text('${_masraflar.length}'),
-                  child: const Icon(Icons.receipt_long_outlined),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Scaffold(
+          body: Column(
+            children: [
+              HeroHeader(
+                seed: _primary,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                turkceTarih(DateTime.now()).toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Yönetici Paneli',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _heroIcon(
+                          tooltip: 'Yenile',
+                          onTap: _yukle,
+                          child: const Icon(Icons.refresh, color: Colors.white, size: 22),
+                        ),
+                        _heroIcon(
+                          tooltip: 'Çıkış',
+                          onTap: _logout,
+                          child: const Icon(Icons.logout, color: Colors.white, size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: TabBar(
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white70,
+                        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        tabs: [
+                          const Tab(height: 44, icon: Icon(Icons.dashboard_outlined, size: 18), text: 'Özet'),
+                          Tab(
+                            height: 44,
+                            icon: Badge(
+                              isLabelVisible: _masraflar.isNotEmpty,
+                              label: Text('${_masraflar.length}'),
+                              child: const Icon(Icons.receipt_long_outlined, size: 18),
+                            ),
+                            text: 'Onaylar',
+                          ),
+                          const Tab(height: 44, icon: Icon(Icons.handyman_outlined, size: 18), text: 'Arızalar'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                text: 'Onaylar',
               ),
-              const Tab(icon: Icon(Icons.handyman_outlined), text: 'Arızalar'),
+              Expanded(
+                child: _loading
+                    ? SkeletonPulse(
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: const [SkeletonCard(), SkeletonCard(), SkeletonCard()],
+                        ),
+                      )
+                    : TabBarView(
+                        children: [_ozetSekmesi(), _onaySekmesi(), _arizaSekmesi()],
+                      ),
+              ),
             ],
           ),
         ),
-        body: _loading
-            ? Center(child: CircularProgressIndicator(color: _primary))
-            : TabBarView(
-                children: [_ozetSekmesi(), _onaySekmesi(), _arizaSekmesi()],
-              ),
       ),
     );
+  }
+
+  // Hero üstündeki yuvarlak cam aksiyon butonu.
+  Widget _heroIcon({required Widget child, required VoidCallback onTap, String? tooltip}) {
+    final buton = Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.14),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(width: 40, height: 40, child: Center(child: child)),
+        ),
+      ),
+    );
+    return tooltip == null ? buton : Tooltip(message: tooltip, child: buton);
   }
 
   // ---- ÖZET ----
@@ -318,7 +413,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               itemBuilder: (context, i) {
                 final m = _masraflar[i];
                 final ilgili = m['is_emri_baslik'] ?? m['ariza_baslik'] ?? '-';
-                return Container(
+                return FadeSlideIn(
+                  index: i,
+                  child: Container(
                   margin: const EdgeInsets.only(bottom: 14),
                   padding: const EdgeInsets.all(16),
                   decoration: AppTheme.cardDecoration,
@@ -375,6 +472,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       ),
                     ],
                   ),
+                  ),
                 );
               },
             ),
@@ -400,7 +498,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               itemBuilder: (context, i) {
                 final a = _arizalar[i];
                 final acil = a['oncelik'] == 'yuksek';
-                return Container(
+                return FadeSlideIn(
+                  index: i,
+                  child: Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: AppTheme.cardDecoration,
                   child: Material(
@@ -461,6 +561,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                       ),
                     ),
+                  ),
                   ),
                 );
               },

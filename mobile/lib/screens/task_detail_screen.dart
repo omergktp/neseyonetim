@@ -12,6 +12,7 @@ import '../services/offline_queue.dart';
 import '../services/sync_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 import 'qr_scan_screen.dart';
 import 'expense_screen.dart';
 
@@ -367,15 +368,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _step(int no, String etiket, {required bool tamam, required bool aktif}) {
-    final renk = tamam ? AppTheme.success : (aktif ? _primary : AppTheme.border);
     final yaziRenk = tamam || aktif ? AppTheme.textDark : AppTheme.textMuted;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(color: renk, shape: BoxShape.circle),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: tamam ? AppTheme.success : (aktif ? null : AppTheme.border),
+            gradient: aktif && !tamam ? AppTheme.brandGradient(_primary) : null,
+            shape: BoxShape.circle,
+            boxShadow: aktif && !tamam
+                ? [BoxShadow(color: _primary.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 3))]
+                : null,
+          ),
           child: Center(
             child: tamam
                 ? const Icon(Icons.check, color: Colors.white, size: 18)
@@ -390,10 +398,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Widget _connector(bool basladi) {
     return Expanded(
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
         height: 3,
         margin: const EdgeInsets.only(bottom: 22),
-        color: basladi ? AppTheme.success : AppTheme.border,
+        decoration: BoxDecoration(
+          color: basladi ? AppTheme.success : AppTheme.border,
+          borderRadius: BorderRadius.circular(2),
+        ),
       ),
     );
   }
@@ -544,14 +556,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             text: 'Göreve başlamak için tesisteki QR kodu okutun. QR yoksa veya hasarlıysa konumunuzla doğrulayın.',
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _startWithQr,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('QR Okut ve Başlat', style: TextStyle(fontSize: 16)),
-              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
-            ),
+          GradientButton(
+            onPressed: _startWithQr,
+            seed: _primary,
+            icon: Icons.qr_code_scanner,
+            label: 'QR Okut ve Başlat',
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -682,15 +691,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: SizedBox(
+                child: GradientButton(
+                  onPressed: _completeTask,
+                  seed: _primary,
                   height: 54,
-                  child: ElevatedButton.icon(
-                    onPressed: _completeTask,
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('Görevi Tamamla', style: TextStyle(fontSize: 16)),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.success, foregroundColor: Colors.white),
-                  ),
+                  icon: Icons.check_circle,
+                  label: 'Görevi Tamamla',
+                  colors: const [AppTheme.success, Color(0xFF15803D)],
                 ),
               ),
             )
@@ -701,9 +708,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _stepIndicator(basladi),
-                  _headerCard(),
-                  _checklistCard(),
+                  FadeSlideIn(index: 0, child: _stepIndicator(basladi)),
+                  FadeSlideIn(index: 1, child: _headerCard()),
+                  FadeSlideIn(index: 2, child: _checklistCard()),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
                     transitionBuilder: (child, anim) => FadeTransition(

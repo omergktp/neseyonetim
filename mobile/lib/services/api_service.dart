@@ -91,8 +91,8 @@ class ApiService {
     await prefs.remove('refresh_token');
     await prefs.remove('rol');
     await prefs.remove('ad_soyad');
-    await prefs.remove('firma_ad');
-    await prefs.remove('firma_logo_url');
+    // Not: firma_ad / firma_logo_url / theme_color BİLEREK korunur — oturum
+    // düşse de login ekranı firmanın kimliğiyle (logo + ad + renk) açılır.
   }
 
   static Future<String?> getRole() async {

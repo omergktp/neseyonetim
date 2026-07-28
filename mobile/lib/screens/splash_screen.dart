@@ -29,6 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
   String _mesaj = '';
   String _storeUrl = '';
   String? _firmaLogoUrl;
+  String? _firmaAd; // kayıtlıysa splash firmanın adıyla açılır ("uygulama bizim" hissi)
 
   @override
   void initState() {
@@ -37,13 +38,16 @@ class _SplashScreenState extends State<SplashScreen> {
     _bootstrap();
   }
 
-  // Girişte kaydedilen firma logosu varsa splash markası onunla açılır.
+  // Girişte kaydedilen firma logosu/adı varsa splash markası onunla açılır.
   Future<void> _firmaLogoYukle() async {
     final prefs = await SharedPreferences.getInstance();
     final url = prefs.getString('firma_logo_url');
-    if (url != null && url.isNotEmpty && mounted) {
-      setState(() => _firmaLogoUrl = url);
-    }
+    final ad = prefs.getString('firma_ad');
+    if (!mounted) return;
+    setState(() {
+      if (url != null && url.isNotEmpty) _firmaLogoUrl = url;
+      if (ad != null && ad.trim().isNotEmpty) _firmaAd = ad.trim();
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -129,15 +133,16 @@ class _SplashScreenState extends State<SplashScreen> {
         children: [
           BrandLogo(size: 84, logoUrl: _firmaLogoUrl),
           const SizedBox(height: 22),
-          const Text('GLOW SAHA',
-              style: TextStyle(
+          Text((_firmaAd ?? 'GLOW SAHA').toUpperCase(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5)),
           const SizedBox(height: 6),
-          const Text('Tesis ve Saha Yönetim Sistemi',
-              style: TextStyle(color: Colors.white38, fontSize: 13)),
+          Text(_firmaAd == null ? 'Tesis ve Saha Yönetim Sistemi' : 'Glow Saha · Tesis ve Saha Yönetimi',
+              style: const TextStyle(color: Colors.white38, fontSize: 13)),
           const SizedBox(height: 36),
           const SizedBox(
             width: 26,

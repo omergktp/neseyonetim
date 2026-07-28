@@ -9,6 +9,7 @@ import '../services/offline_queue.dart';
 import '../services/sync_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ui_utils.dart';
+import '../widgets/ui_kit.dart';
 
 class ExpenseScreen extends StatefulWidget {
   final int? isEmriId; // İş emrine bağlı masraf
@@ -270,18 +271,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                   const SizedBox(height: 24),
 
                   // Gönder butonu
-                  SizedBox(
-                    width: double.infinity,
+                  GradientButton(
+                    onPressed: _submitExpense,
+                    seed: primary,
                     height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: _submitExpense,
-                      icon: const Icon(Icons.send),
-                      label: const Text('Masrafı Onaya Gönder', style: TextStyle(fontSize: 16)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
+                    icon: Icons.send,
+                    label: 'Masrafı Onaya Gönder',
                   ),
                 ],
               ),
